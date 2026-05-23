@@ -52,8 +52,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
 .custom-marker.favorited:hover { box-shadow: 0 4px 16px rgba(232,87,123,0.6); }
 .custom-marker::after { content: ''; position: absolute; width: 12px; height: 12px; background: var(--white); border-radius: 50%; top: 7px; left: 7px; }
 
-.district-legend { position: absolute; bottom: 20px; left: 20px; z-index: 999; background: var(--white); padding: 8px 14px; border-radius: var(--radius-sm); font-size: 12px; color: var(--text-light); box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; }
-.district-legend .line { width: 20px; height: 2.5px; background: #9333EA; border-radius: 2px; }
+.district-tooltip { background: rgba(45,45,63,0.85); color: #fff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 13px; font-weight: 600; font-family: "PingFang SC","Microsoft YaHei",sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+.leaflet-tooltip.district-tooltip::before { border-top-color: rgba(45,45,63,0.85); }
 
 .sidebar { width: 420px; background: var(--white); display: flex; flex-direction: column; border-left: 1px solid var(--pink-100); z-index: 999; }
 .sidebar-search { padding: 16px 16px 12px; position: relative; }
@@ -137,7 +137,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
   .sidebar { width: 100%; flex: 1; border-left: none; border-top: 1px solid var(--pink-100); transition: all 0.3s ease; }
   .map-expand-btn { display: block; }
   .modal { width: 92vw; padding: 20px; max-height: 85vh; }
-  .district-legend { bottom: 80px; }
   .header { padding: 0 12px; }
   .header-logo { font-size: 15px; }
   .header-logo span { font-size: 12px; }
@@ -153,7 +152,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
   .main-container.map-expanded .sidebar > * { display: none; }
   .main-container.map-expanded .sidebar::before { content: '🔽 向下滑动查看列表'; display: flex; align-items: center; justify-content: center; height: 50px; font-size: 13px; color: var(--pink-400); font-weight: 600; cursor: pointer; }
   .main-container.map-expanded .map-expand-btn { bottom: 70px; }
-  .main-container.map-expanded .district-legend { bottom: 120px; }
 }
 @media (max-width: 400px) {
   .header-actions { gap: 4px; }
@@ -177,7 +175,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
   <div class="map-wrapper">
     <div id="map"></div>
     <button class="map-expand-btn" onclick="toggleMapExpand()" id="mapExpandBtn">🗺️ 全屏地图</button>
-    <div class="district-legend"><span class="line"></span> 郑州市八区+航空港区界（紫色虚线，悬浮查看区名）</div>
   </div>
   <div class="sidebar">
     <div class="sidebar-search">
@@ -476,16 +473,46 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&
 const homeIcon=L.divIcon({className:'',html:'<div style="background:#E8577B;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid white;box-shadow:0 3px 12px rgba(232,87,123,0.5);">🏠</div>',iconSize:[36,36],iconAnchor:[18,18]});
 L.marker([HOME_LAT,HOME_LNG],{icon:homeIcon}).addTo(map).bindPopup('<b>🏠 空港辰院一期达园</b><br>你的家 📍<br><small>所有距离从此处计算</small>').bindTooltip('🏠 我的家',{permanent:true,direction:'top',offset:[0,-22]});
 
-// district boundaries
-const DS={color:'#9333EA',weight:4,opacity:0.95,fillOpacity:0.05,fillColor:'#9333EA',dashArray:'8 5'};
-const DH={color:'#A855F7',weight:6,opacity:1,fillOpacity:0.10,fillColor:'#A855F7'};
-let dLayer;
+// district boundaries — 9-color pastel palette
+const DISTRICT_COLORS=[
+  {fill:'#FFFDE7',stroke:'#C8B900'}, // 淡黄
+  {fill:'#FFF0F3',stroke:'#D4889E'}, // 淡粉
+  {fill:'#F3E5F5',stroke:'#9B59B6'}, // 淡紫
+  {fill:'#E8F5E9',stroke:'#5DA87D'}, // 淡绿
+  {fill:'#E3F2FD',stroke:'#5DADE2'}, // 淡蓝
+  {fill:'#FFF3E0',stroke:'#E67E22'}, // 淡橙
+  {fill:'#FCE4EC',stroke:'#C0392B'}, // 淡桃
+  {fill:'#E0F2F1',stroke:'#117864'}, // 淡青
+  {fill:'#EDE7F6',stroke:'#7D3C98'}, // 淡灰紫
+];
+const NAME_TO_COLOR={
+  '金水区':0,'二七区':1,'中原区':2,'管城回族区':3,'惠济区':4,
+  '郑东新区':5,'高新区':6,'经开区':7,'航空港区':8,
+  '上街区':5,'中牟县':6,'新郑市':7,'荥阳市':8,'新密市':0,'巩义市':1,'登封市':2,
+};
+let dLayer,cIdx=0;
+function distStyle(f){
+  const name=f.properties.name||'';
+  const idx=NAME_TO_COLOR[name]!=null?NAME_TO_COLOR[name]:(cIdx++%9);
+  const c=DISTRICT_COLORS[idx];
+  return{color:c.stroke,weight:2.5,opacity:0.85,fillColor:c.fill,fillOpacity:0.35};
+}
+function distHoverStyle(f){
+  const name=f.properties.name||'';
+  const idx=NAME_TO_COLOR[name]!=null?NAME_TO_COLOR[name]:(cIdx++%9);
+  const c=DISTRICT_COLORS[idx];
+  return{color:c.stroke,weight:4.5,opacity:1,fillColor:c.fill,fillOpacity:0.55};
+}
 async function loadDistricts(){
   try{
     const r=await fetch('https://geo.datav.aliyun.com/areas_v3/bound/410100_full.json',{signal:AbortSignal.timeout(8000)});
     if(!r.ok)return;
     const g=await r.json();
-    dLayer=L.geoJSON(g,{style:DS,onEachFeature:(f,l)=>{l.bindTooltip(f.properties.name||'',{sticky:true,direction:'center'});l.on('mouseover',()=>l.setStyle(DH));l.on('mouseout',()=>l.setStyle(DS));}}).addTo(map);
+    dLayer=L.geoJSON(g,{style:distStyle,onEachFeature:(f,l)=>{
+      l.bindTooltip(f.properties.name||'',{sticky:true,direction:'center',className:'district-tooltip'});
+      l.on('mouseover',()=>l.setStyle(distHoverStyle(f)));
+      l.on('mouseout',()=>l.setStyle(distStyle(f)));
+    }}).addTo(map);
     console.log('✅ 郑州区县边界已加载');
   }catch(e){console.log('⚠️ 区县边界加载失败');}
 }
