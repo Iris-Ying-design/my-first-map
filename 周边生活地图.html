@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>空港辰院 · 周边生活地图</title>
+<meta name="theme-color" content="#E8577B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="周边生活地图">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23E8577B'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='0.08em' font-size='40'%3E🏠%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+:root {
+  --pink-50: #FFF0F3; --pink-100: #FFE0E6; --pink-200: #FFB3C1;
+  --pink-300: #FF8FA3; --pink-400: #E8577B; --pink-500: #C73E5F;
+  --blue: #3388FF; --blue-dark: #2563EB; --purple: #8B5CF6;
+  --text: #2D2D3F; --text-light: #6B6B80; --white: #FFFFFF;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06); --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.12); --radius-sm: 8px;
+  --radius: 12px; --radius-lg: 16px; --radius-xl: 20px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--pink-50); color: var(--text); height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased; }
+
+.header { height: 52px; background: var(--white); border-bottom: 1px solid var(--pink-100); display: flex; align-items: center; padding: 0 20px; gap: 12px; z-index: 1000; position: relative; }
+.header-logo { font-size: 18px; font-weight: 700; color: var(--pink-400); white-space: nowrap; }
+.header-logo span { color: var(--text); font-weight: 500; font-size: 15px; }
+.header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.btn-primary { background: var(--pink-400); color: var(--white); }
+.btn-primary:hover { background: var(--pink-500); transform: translateY(-1px); }
+.btn-outline { background: var(--white); color: var(--pink-400); border: 1.5px solid var(--pink-200); }
+.btn-outline:hover { background: var(--pink-50); }
+.btn-outline.active { background: var(--pink-100); border-color: var(--pink-300); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-danger { background: transparent; color: #E74C3C; border: 1px solid #FADBD8; }
+.btn-danger:hover { background: #FADBD8; }
+
+.main-container { display: flex; height: calc(100vh - 52px); }
+.map-wrapper { flex: 1; position: relative; min-width: 0; }
+#map { width: 100%; height: 100%; touch-action: manipulation; }
+
+.custom-marker { background: var(--blue); border: 3px solid var(--white); border-radius: 50% 50% 50% 0; width: 32px; height: 32px; transform: rotate(-45deg); box-shadow: 0 2px 10px rgba(51,136,255,0.45); transition: transform 0.15s, box-shadow 0.15s; cursor: pointer; }
+.custom-marker:hover { transform: rotate(-45deg) scale(1.2); box-shadow: 0 4px 16px rgba(51,136,255,0.6); }
+.custom-marker.favorited { background: var(--pink-400); box-shadow: 0 2px 10px rgba(232,87,123,0.45); }
+.custom-marker.favorited:hover { box-shadow: 0 4px 16px rgba(232,87,123,0.6); }
+.custom-marker::after { content: ''; position: absolute; width: 12px; height: 12px; background: var(--white); border-radius: 50%; top: 7px; left: 7px; }
+
+.district-legend { position: absolute; bottom: 20px; left: 20px; z-index: 999; background: var(--white); padding: 8px 14px; border-radius: var(--radius-sm); font-size: 12px; color: var(--text-light); box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; }
+.district-legend .line { width: 20px; height: 2.5px; background: #9333EA; border-radius: 2px; }
+
+.sidebar { width: 420px; background: var(--white); display: flex; flex-direction: column; border-left: 1px solid var(--pink-100); z-index: 999; }
+.sidebar-search { padding: 16px 16px 12px; position: relative; }
+.sidebar-search input { width: 100%; padding: 10px 14px 10px 38px; border: 1.5px solid var(--pink-100); border-radius: var(--radius); font-size: 14px; outline: none; font-family: inherit; background: var(--pink-50); transition: all 0.2s; }
+.sidebar-search input:focus { border-color: var(--pink-300); background: var(--white); }
+.sidebar-search .search-icon { position: absolute; left: 28px; top: 26px; color: var(--text-light); font-size: 15px; pointer-events: none; }
+
+.filter-chips { display: flex; gap: 6px; padding: 0 16px 12px; flex-wrap: wrap; }
+.chip { padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1.5px solid var(--pink-100); background: var(--white); color: var(--text-light); transition: all 0.2s; font-family: inherit; }
+.chip:hover { border-color: var(--pink-300); }
+.chip.active { background: var(--pink-200); color: var(--pink-500); border-color: var(--pink-200); }
+.chip.fav-filter { margin-left: auto; }
+.chip.fav-filter.active { background: var(--pink-400); color: white; border-color: var(--pink-400); }
+
+.card-list { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+.card-list::-webkit-scrollbar { width: 5px; }
+.card-list::-webkit-scrollbar-track { background: transparent; }
+.card-list::-webkit-scrollbar-thumb { background: var(--pink-100); border-radius: 10px; }
+
+.card { background: var(--white); border: 1.5px solid var(--pink-50); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: all 0.15s; position: relative; }
+.card:hover { border-color: var(--pink-200); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.card.highlight { border-color: var(--pink-400); background: #FFF5F7; }
+.card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.card-title { font-size: 15px; font-weight: 600; color: var(--text); flex: 1; line-height: 1.3; }
+.card-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.badge-restaurant { background: #FFF0E6; color: #E67E22; } .badge-mall { background: #E8F4FD; color: #2980B9; } .badge-entertainment { background: #EDE8FD; color: #7C3AED; }
+.card-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-light); margin-bottom: 4px; flex-wrap: wrap; }
+.card-address { font-size: 12px; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+.card-desc { font-size: 13px; color: var(--text-light); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-route { display: flex; gap: 12px; margin: 6px 0; font-size: 11px; color: var(--purple); flex-wrap: wrap; }
+.card-route span { display: inline-flex; align-items: center; gap: 3px; background: #F5F0FF; padding: 3px 8px; border-radius: 10px; }
+.card-actions { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
+
+.stars { color: #F39C12; letter-spacing: 1px; font-size: 13px; }
+.fav-icon { position: absolute; top: 12px; right: 12px; font-size: 18px; cursor: pointer; transition: transform 0.15s; user-select: none; z-index: 2; }
+.fav-icon:hover { transform: scale(1.2); }
+.fav-icon.active { animation: heartBeat 0.4s ease; }
+@keyframes heartBeat { 0% { transform: scale(1); } 25% { transform: scale(1.3); } 50% { transform: scale(1); } 75% { transform: scale(1.2); } 100% { transform: scale(1); } }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-light); }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; line-height: 1.8; }
+
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal { background: var(--white); border-radius: var(--radius-xl); width: 500px; max-height: 82vh; overflow-y: auto; box-shadow: var(--shadow-lg); padding: 28px; animation: slideUp 0.2s ease; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal h2 { font-size: 20px; margin-bottom: 20px; color: var(--text); }
+.modal h3 { font-size: 15px; margin: 16px 0 8px; color: var(--text); }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-light); margin-bottom: 4px; }
+.form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px 12px; border: 1.5px solid var(--pink-100); border-radius: var(--radius-sm); font-size: 14px; outline: none; font-family: inherit; transition: border-color 0.2s; }
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--pink-300); }
+.form-group textarea { resize: vertical; min-height: 60px; }
+.form-row { display: flex; gap: 10px; }
+.form-row .form-group { flex: 1; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--pink-50); }
+.coord-pick-hint { font-size: 12px; color: var(--pink-400); margin-top: 4px; }
+
+.detail-section { margin-bottom: 16px; }
+.detail-section h3 { font-size: 13px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600; }
+.detail-section p { font-size: 14px; line-height: 1.7; color: var(--text); }
+.detail-section .review-card { background: var(--pink-50); padding: 12px 14px; border-radius: var(--radius-sm); margin-top: 8px; font-size: 13px; line-height: 1.6; }
+.detail-section .review-source { font-size: 11px; color: var(--pink-400); font-weight: 600; margin-top: 4px; }
+.detail-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.detail-header .icon-circle { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+.icon-restaurant { background: #FFF0E6; } .icon-mall { background: #E8F4FD; } .icon-entertainment { background: #EDE8FD; }
+.detail-image { width: 100%; border-radius: var(--radius); margin-bottom: 16px; max-height: 260px; object-fit: cover; cursor: pointer; background: var(--pink-50); }
+.detail-image-placeholder { width: 100%; height: 160px; border-radius: var(--radius); margin-bottom: 16px; background: linear-gradient(135deg, var(--pink-50), var(--pink-100)); display: flex; align-items: center; justify-content: center; color: var(--pink-300); font-size: 40px; }
+.route-info-bar { display: flex; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+.route-info-item { display: flex; align-items: center; gap: 6px; background: #F5F0FF; padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; color: #6D28D9; font-weight: 500; }
+
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--white); padding: 10px 24px; border-radius: 20px; font-size: 14px; z-index: 9999; box-shadow: var(--shadow-lg); animation: toastIn 0.3s ease; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+.confirm-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.2); z-index: 3000; display: flex; align-items: center; justify-content: center; }
+.confirm-box { background: var(--white); padding: 24px 28px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); text-align: center; max-width: 340px; }
+.confirm-box p { font-size: 15px; margin-bottom: 18px; line-height: 1.6; }
+.confirm-box .btn-row { display: flex; gap: 10px; justify-content: center; }
+@media (max-width: 768px) {
+  .main-container { flex-direction: column; }
+  .map-wrapper { height: 45vh; }
+  .sidebar { width: 100%; flex: 1; border-left: none; border-top: 1px solid var(--pink-100); }
+  .modal { width: 92vw; padding: 20px; max-height: 85vh; }
+  .district-legend { bottom: 80px; }
+  .header { padding: 0 12px; }
+  .header-logo { font-size: 15px; }
+  .header-logo span { font-size: 12px; }
+  .btn { padding: 10px 14px; font-size: 13px; }
+  .btn-sm { padding: 8px 12px; font-size: 12px; }
+  .chip { padding: 7px 14px; font-size: 13px; }
+  .card { padding: 14px; }
+  .card-actions .btn { padding: 8px 12px; font-size: 12px; }
+  .leaflet-control-zoom { display: none; }
+}
+@media (max-width: 400px) {
+  .header-actions { gap: 4px; }
+  .header-actions .btn { padding: 7px 10px; font-size: 11px; }
+  .filter-chips { gap: 4px; padding: 0 8px 8px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">🏠 <span>空港辰院 · 周边生活地图</span></div>
+  <div class="header-actions">
+    <button class="btn btn-outline btn-sm" id="btnShowFavorites" onclick="toggleFavFilter()">❤️ 只看收藏</button>
+    <button class="btn btn-outline btn-sm" onclick="downloadPage()">📥 下载</button>
+    <button class="btn btn-primary" onclick="openAddModal()">+ 添加地点</button>
+  </div>
+</div>
+
+<div class="main-container">
+  <div class="map-wrapper">
+    <div id="map"></div>
+    <div class="district-legend"><span class="line"></span> 郑州市八区+航空港区界（紫色虚线，悬浮查看区名）</div>
+  </div>
+  <div class="sidebar">
+    <div class="sidebar-search">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="搜索地点名称、地址..." oninput="renderCards()">
+    </div>
+    <div class="filter-chips">
+      <button class="chip active" onclick="setFilter('all', this)">全部</button>
+      <button class="chip" onclick="setFilter('restaurant', this)">🍽️ 餐厅</button>
+      <button class="chip" onclick="setFilter('mall', this)">🛍️ 商场</button>
+      <button class="chip" onclick="setFilter('entertainment', this)">🎮 娱乐</button>
+      <button class="chip sort-chip" id="sortChip" onclick="toggleSort()">🕐 最新</button>
+      <button class="chip fav-filter" id="favChip" onclick="toggleFavFilter()">❤️ 收藏</button>
+    </div>
+    <div class="card-list" id="cardList"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addModal" style="display:none;">
+  <div class="modal">
+    <h2 id="modalTitle">添加新地点</h2>
+    <div class="form-group"><label>名称 *</label><input type="text" id="formName" placeholder="例如：海底捞火锅"></div>
+    <div class="form-row">
+      <div class="form-group"><label>分类 *</label><select id="formCategory"><option value="restaurant">🍽️ 餐厅</option><option value="mall">🛍️ 商场</option><option value="entertainment">🎮 娱乐</option></select></div>
+      <div class="form-group"><label>评分</label><select id="formRating"><option value="5">⭐⭐⭐⭐⭐ (5分)</option><option value="4" selected>⭐⭐⭐⭐ (4分)</option><option value="3">⭐⭐⭐ (3分)</option><option value="2">⭐⭐ (2分)</option><option value="1">⭐ (1分)</option></select></div>
+    </div>
+    <div class="form-group"><label>地址</label><input type="text" id="formAddress" placeholder="例如：金水区花园路122号"></div>
+    <div class="form-group"><label>电话</label><input type="text" id="formPhone" placeholder="例如：0371-12345678"></div>
+    <div class="form-group"><label>图片URL（可从小红书/大众点评复制图片链接）</label><input type="text" id="formImage" placeholder="粘贴图片链接，用于展示该地点的照片"></div>
+    <div class="form-group"><label>简介描述</label><textarea id="formDesc" placeholder="简单描述这个地方的特色..."></textarea></div>
+    <div class="form-group"><label>用户评价（可从小红书/大众点评摘录）</label><textarea id="formReview" placeholder="粘贴用户评价..."></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>纬度</label><input type="text" id="formLat" placeholder="例如：34.537"></div>
+      <div class="form-group"><label>经度</label><input type="text" id="formLng" placeholder="例如：113.845"></div>
+    </div>
+    <p class="coord-pick-hint">💡 点击地图上的位置自动获取经纬度</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="savePlace()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="detailModal" style="display:none;"><div class="modal" id="detailContent"></div></div>
+<div class="confirm-overlay" id="confirmDialog" style="display:none;"><div class="confirm-box"><p id="confirmMsg"></p><div class="btn-row"><button class="btn btn-outline" onclick="hideConfirm()">取消</button><button class="btn btn-danger" onclick="confirmDelete()">确认删除</button></div></div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const HOME_LAT=34.537,HOME_LNG=113.845,STORAGE_KEY='konggang_map_v4';
+
+function loadPlaces(){
+  try{
+    const r=localStorage.getItem(STORAGE_KEY);
+    if(r){
+      const existing=JSON.parse(r);
+      const defs=getDefaults();
+      const existIds=new Set(existing.map(p=>p.id));
+      const newOnes=defs.filter(p=>!existIds.has(p.id));
+      if(newOnes.length>0){
+        const merged=[...existing,...newOnes];
+        localStorage.setItem(STORAGE_KEY,JSON.stringify(merged));
+        return merged;
+      }
+      return existing;
+    }
+    // migrate from v3
+    const v3=localStorage.getItem('konggang_map_v3');
+    if(v3){
+      const old=JSON.parse(v3);
+      const defs=getDefaults();
+      const oldIds=new Set(old.map(p=>p.id));
+      const newOnes=defs.filter(p=>!oldIds.has(p.id));
+      const merged=[...old,...newOnes];
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(merged));
+      return merged;
+    }
+    // migrate from v2
+    const o=localStorage.getItem('konggang_map_places_v2');
+    if(o){
+      const old=JSON.parse(o);
+      const defs=getDefaults();
+      const oldIds=new Set(old.map(p=>p.id));
+      const newOnes=defs.filter(p=>!oldIds.has(p.id));
+      const merged=[...old,...newOnes];
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(merged));
+      return merged;
+    }
+  }catch(e){}
+  return getDefaults();
+}
+function savePlaces(){localStorage.setItem(STORAGE_KEY,JSON.stringify(places));}
+
+function getDefaults(){
+  const n=Date.now();
+  const m=[// malls
+    {id:'m01',name:'锦荣悦汇城',category:'mall',lat:34.535,lng:113.847,address:'航空港区雍州路与巡航路交叉口（地铁恩平湖站直达）',rating:4,desc:'港区最大商业综合体，200+品牌（优衣库/星巴克/海底捞/奥斯卡影城），约1.8万㎡影视拍摄基地。',review:'港区最好的商场，品牌全、四楼美食多。周末停车位紧张，最近新增影视基地很有趣！',image:'',favorited:false,createdAt:n-100},
+    {id:'m02',name:'沃金商业广场',category:'mall',lat:34.544,lng:113.839,address:'航空港区郑港六路与郑港四街交叉口',rating:3,desc:'港区北部社区商业中心，超市+餐饮+药店+夜市摊位。',review:'离家近买菜方便，二楼小吃不错，整体档次一般但胜在便利。',image:'',favorited:false,createdAt:n-200},
+    {id:'m03',name:'航线里飞行主题街区',category:'mall',lat:34.527,lng:113.842,address:'航空港区（近新郑机场）',rating:5,desc:'中原首个飞行主题街区，92.5亩开放式空间。低视角观机坪、巨型航翼装置、林下市集、航空文创馆。春节单日客流3万+。',review:'超酷！近距离看飞机起降，拍照绝佳。市集很有意思，二期还有露营+跨境电商。',image:'',favorited:false,createdAt:n-300},
+    {id:'m04',name:'空港跨境购物广场',category:'mall',lat:34.537,lng:113.843,address:'航空港区华夏大道与云港路交叉口',rating:4,desc:'进口商品直销+中西主题餐饮+电影院，各国进口零食/化妆品/日用品。',review:'进口零食种类多价格比市区便宜，购物环境不错值得逛。',image:'',favorited:false,createdAt:n-400},
+    {id:'m05',name:'锦荣广场',category:'mall',lat:34.537,lng:113.848,address:'航空港区空港CBD·领事馆区（地铁上盖）',rating:4,desc:'11万㎡商务集群+3万㎡商业区，亚朵酒店/奥斯卡影城/汉堡王/豪享来/黄金时代健身。',review:'新商业体，亚朵酒店环境好，电影院设备新。比悦汇城人少逛起来舒服。',image:'',favorited:false,createdAt:n-500},
+    {id:'m06',name:'东泉购物广场',category:'mall',lat:34.546,lng:113.838,address:'航空港区长安路与洞庭湖路交叉口',rating:3,desc:'社区型购物广场，"深夜食堂"美食区有网红打卡点和大胃王挑战赛。',review:'深夜食堂很热闹，晚上来吃宵夜好去处，烩面烧烤都不错。',image:'',favorited:false,createdAt:n-600},
+    {id:'m07',name:'郑东万象城',category:'mall',lat:34.789,lng:113.753,address:'郑东新区金水东路与东风南路交叉口',rating:5,desc:'郑州最新高端商业地标！汇集NEED韩料/胡恰江西菜/牛排家等首店，200+品牌，餐饮+购物+体验一体。',review:'郑州最火的新商场！首店扎堆，NEED和胡恰排队超夸张。环境高级，逛街体验一流。',image:'',favorited:false,createdAt:n-700},
+    {id:'m08',name:'正弘城',category:'mall',lat:34.790,lng:113.689,address:'金水区花园路126号（地铁2号线东风路站）',rating:5,desc:'花园路核心商圈标杆，引入点都德/野果/礼部/巴奴等热门餐饮，时尚品牌云集，地铁直达。',review:'金水区最火的商场之一，点都德粤菜排队王！7楼餐饮选择多，逛街购物一站搞定。',image:'',favorited:false,createdAt:n-800},
+    {id:'m09',name:'丹尼斯大卫城',category:'mall',lat:34.760,lng:113.665,address:'二七区二七路与太康路交叉口',rating:5,desc:'郑州老牌高端商场，国际大牌+高端餐饮云集。梅果/曼玉/祖母的厨房/王品牛排等热门餐厅均在11-12楼。',review:'郑州最高端的商场，大牌多环境好。11楼的梅果排队太夸张但值得等！曼玉融合菜约会首选。',image:'',favorited:false,createdAt:n-900},
+    {id:'m10',name:'二七万象城',category:'mall',lat:34.755,lng:113.665,address:'二七区民主路与五彩路交叉口（二七广场旁）',rating:4,desc:'二七商圈核心商场，品牌齐全。OTF加州餐厅等网红餐饮入驻，紧邻二七广场地铁站。',review:'二七广场旁边，交通方便。OTF加州餐厅拍照出片，整体逛街体验不错。',image:'',favorited:false,createdAt:n-1000},
+    {id:'m11',name:'熙地港 (CityOn)',category:'mall',lat:34.796,lng:113.723,address:'郑东新区农业东路与众意西路交叉口',rating:4,desc:'郑东新区高端社区商场，环境优雅。进口超市+品质餐饮+时尚品牌，周边居民首选。',review:'环境很好，人不多逛起来舒服。进口超市东西全，餐饮品质都不错。',image:'',favorited:false,createdAt:n-1100},
+    {id:'m12',name:'正弘汇',category:'mall',lat:34.803,lng:113.623,address:'高新区科学大道与长椿路交叉口',rating:4,desc:'高新区商业新地标，填补区域空白。大型超市+电影院+品质餐饮。',review:'高新区终于有个大商场了！品牌还算全，餐饮选择多，不用再跑市区了。',image:'',favorited:false,createdAt:n-1200},
+    {id:'m13',name:'亚细亚卓悦城',category:'mall',lat:34.753,lng:113.666,address:'二七区德化街与西大街交叉口（二七广场）',rating:3,desc:'二七广场老牌商场焕新升级，主打年轻潮流+美食街区。',review:'二七广场地标，升级后比以前好多了。美食街区选择多，逛完二七塔顺便吃。',image:'',favorited:false,createdAt:n-1300},
+    {id:'m14',name:'二七万达广场',category:'mall',lat:34.731,lng:113.651,address:'二七区大学路与航海路交叉口',rating:4,desc:'二七区核心商业综合体，万达影城+大型超市+200+品牌餐饮购物一站式。',review:'二七区最大的商场，万达影城效果好。吃逛玩一条龙，周末人气很旺。',image:'',favorited:false,createdAt:n-1400},
+    {id:'m15',name:'探十里购物中心',category:'mall',lat:34.755,lng:113.631,address:'中原区桐柏路与陇海路交叉口东南角（地铁5号线陇海西路站A口）',rating:4,desc:'11万㎡家庭型购物中心，盒马鲜生/MUJI/优衣库/迪卡侬入驻。由原大商改造而来，地上5层。',review:'盒马鲜生太方便了！MUJI和优衣库都有，带娃逛街的好地方。停车位充足。',image:'',favorited:false,createdAt:n-1500},
+    {id:'m16',name:'新田360广场 (国贸店)',category:'mall',lat:34.785,lng:113.680,address:'金水区花园路与农业路交叉口',rating:4,desc:'金水区老牌商场，快时尚+美食广场+电影院，年轻人的聚集地。',review:'学生时代的回忆，快时尚品牌多价格亲民。美食广场选择丰富，性价比高。',image:'',favorited:false,createdAt:n-1600},
+    {id:'m17',name:'木色购物中心',category:'mall',lat:34.793,lng:113.760,address:'郑东新区商务外环路与九如路交叉口',rating:4,desc:'郑东新区CBD核心商圈，高端精品超市+品质餐饮+设计师品牌。环境雅致。',review:'CBD白领的食堂+购物地，环境安静雅致。餐饮品质高，适合商务午餐。',image:'',favorited:false,createdAt:n-1700},
+    {id:'m18',name:'嵩南印象城',category:'mall',lat:34.718,lng:113.626,address:'二七区嵩山南路与桂江路交叉口东北',rating:4,desc:'2025年8月新开业！5万㎡社区商业，近1万㎡室外场地含宠物公园+儿童公园+荆芥农场+草坪。',review:'新开的社区商场，宠物友好太赞了！户外草坪很大，带孩子和狗一起逛。',image:'',favorited:false,createdAt:n-1800},
+    {id:'m19',name:'银泰inPARK',category:'mall',lat:34.810,lng:113.738,address:'郑东新区龙湖金融岛内环（地铁4号线金融岛南站）',rating:5,desc:'28万㎡公园商业新形态！2.3公里环湖步道，5.6平方公里龙湖水域。街区+mall+微景观，郑州最美商场之一。',review:'郑州最美商场没有之一！环湖散步+逛街太惬意了。傍晚景色绝美，约会圣地。',image:'',favorited:false,createdAt:n-1900},
+    {id:'m20',name:'万达坊 (花园路店)',category:'mall',lat:34.793,lng:113.695,address:'金水区花园路122号（花园路与农科路交叉口，近正弘城）',rating:4,desc:'紧邻正弘城的商业综合体，言几又书店+品质餐饮+生活品牌。',review:'和正弘城连着逛，言几又书店环境很美。餐饮选择多，人没正弘城那么多。',image:'',favorited:false,createdAt:n-2000},
+    // 经开区 (东北方向 ~15km)
+    {id:'m21',name:'乐尚天地生活广场',category:'mall',lat:34.725,lng:113.855,address:'经开区航海东路与经开第五大街交叉口',rating:4,desc:'经开区核心商业综合体，超市+影城+餐饮+儿童游乐，服务周边企业和居民。',review:'经开区少有的综合商场，超市大品牌全。餐饮选择不少，工作日中午人超多。',image:'',favorited:false,createdAt:n-2010},
+    // 新郑市区 (正南方向 ~15km)
+    // 中牟 (正东方向 ~20km)
+    // 惠济区 (正北偏西方向 ~35km)
+    {id:'m24',name:'惠济万达广场',category:'mall',lat:34.870,lng:113.620,address:'惠济区文化北路与开元路交叉口（地铁2号线黄河迎宾馆站）',rating:4,desc:'郑州北部最大商业综合体，万达影城IMAX+永辉超市+200+品牌，惠济区商业地标。',review:'惠济区终于有万达了！品牌齐全逛街方便，IMAX效果震撼。北区人民不用跑市区了。',image:'',favorited:false,createdAt:n-2040},
+    // 高新区 (西北方向 ~30km)
+    {id:'m25',name:'高新万科广场',category:'mall',lat:34.808,lng:113.580,address:'高新区科学大道与西四环交叉口',rating:4,desc:'高新区西部商业新地标。大型超市+影院+品质餐饮+儿童乐园，填补区域空白。',review:'高新区西边终于有大商场了！万科运营品质有保证，餐饮丰富停车方便。',image:'',favorited:false,createdAt:n-2050},
+    {id:'m26',name:'龙湖美盛天街',category:'mall',lat:34.807,lng:113.687,address:'金水区文化北路与魏河北路交叉口（金水北片区）',rating:4,desc:'2025年12月新开！龙湖天街中原首作，7.5万㎡。180+品牌，城北首家迪卡侬、鲜风生活超市、好莱坞影城IP联名旗舰店。城市首店20%。',review:'金水北终于有了大商场！迪卡侬和鲜风超市太方便了，海底捞有全国独家创新店型。品牌首店多，逛起来很新鲜。',image:'',favorited:false,createdAt:n-2060},
+    {id:'m27',name:'荟品仓·城市奥莱 (奥体中心仓)',category:'mall',lat:34.750,lng:113.585,address:'中原区奥体中心东广场（CCD核心区，地铁6/14号线奥体中心站）',rating:4,desc:'2025年12月新开！华中首店，1.6万㎡仓储式品牌折扣奥莱。Nike/Adidas/斯凯奇等300+品牌，全场1-3折。',review:'批发价买大牌太香了！Nike阿迪都是一两折，仓储式购物体验很新奇。地铁直达超方便，周末人多建议早去。',image:'',favorited:false,createdAt:n-2070},
+    {id:'m28',name:'亳都·新象',category:'mall',lat:34.753,lng:113.669,address:'管城区东大街与紫荆山路交叉口（商都遗址旁）',rating:5,desc:'管城区城市更新标杆！文化+首店融合街区，明清建筑风格+潮流业态。星巴克臻选/P9咖啡/本地文创品牌入驻，2025年新开。',review:'郑州最有文化气息的商业街区！逛遗址博物馆顺便来这，古建拍照超出片。星巴克臻选开在老房子里太有感觉了。',image:'',favorited:false,createdAt:n-2080},
+  ];
+
+  const r=[// restaurants
+    // === 航空港区 (近家) ===
+    {id:'r01',name:'海底捞火锅 (航空港店)',category:'restaurant',lat:34.535,lng:113.847,address:'航空港区锦荣悦汇城3楼',phone:'0371-56565588',rating:5,desc:'全国连锁火锅标杆，服务贴心食材新鲜。番茄锅和牛油辣锅是招牌。等位可美甲吃零食。',review:'服务没话说！番茄汤底浓郁好喝，捞派滑牛肉和虾滑必点。饭点排队较长建议提前去。',image:'',favorited:false,createdAt:n-2100},
+    {id:'r02',name:'喜渝福重庆老火锅',category:'restaurant',lat:34.541,lng:113.838,address:'航空港区长安路与云港路交叉口',rating:5,desc:'大众点评4.7分！牛油锅底醇厚正宗，毛肚新鲜脆爽，重庆风味地道。港区排名第一。',review:'港区排名第一的重庆火锅！牛油味超浓，毛肚七上八下刚刚好，酥肉也好吃。爱吃辣必来！',image:'',favorited:false,createdAt:n-2200},
+    {id:'r03',name:'胡庆一重庆老火锅',category:'restaurant',lat:34.520,lng:113.851,address:'新郑市薛店镇（近机场）',rating:5,desc:'大众点评4.7分！九宫格锅底+重庆老街氛围装修。鲜鸭血和手切牛肉广受好评。',review:'九宫格吃法很正宗，鸭血嫩滑入口即化。装修很有重庆老街感觉，适合拍照打卡。',image:'',favorited:false,createdAt:n-2300},
+    {id:'r04',name:'阿润打边炉',category:'restaurant',lat:34.526,lng:113.843,address:'新郑国际机场区域内',rating:4,desc:'大众点评4.5分！金牌花胶鸡锅底，汤底浓郁养生，适合不吃辣的朋友。',review:'花胶鸡锅太鲜了！先喝汤再涮菜，养生又美味。冬天来一锅暖到心里。',image:'',favorited:false,createdAt:n-2400},
+    {id:'r05',name:'京熙涮肉',category:'restaurant',lat:34.540,lng:113.838,address:'航空港区云港路',rating:4,desc:'大众点评4.4分！传统铜锅涮肉，优质羊肉配地道麻酱，老北京风味。',review:'铜锅涮肉就是香！羊肉新鲜不膻，麻酱调得正好。想吃清淡火锅时的首选。',image:'',favorited:false,createdAt:n-2500},
+    {id:'r06',name:'王北北潮汕牛肉火锅',category:'restaurant',lat:34.538,lng:113.843,address:'航空港区绿轴公园周边',rating:4,desc:'牛肉现切现涮，手打牛丸Q弹爆汁，汤底清甜。大众点评4.2分。',review:'牛肉真的很新鲜，师傅现场切。手打牛丸弹牙爆汁，潮汕风味正宗。',image:'',favorited:false,createdAt:n-2600},
+    {id:'r07',name:'方中山胡辣汤 (航空港店)',category:'restaurant',lat:34.541,lng:113.840,address:'航空港区长安路',rating:4,desc:'郑州早餐名片！胡辣汤浓稠香辣，配水煎包或油条是河南人标准早餐。',review:'来河南必喝的胡辣汤！方中山是最有名的牌子，麻辣鲜香，早上喝一碗浑身都暖了。',image:'',favorited:false,createdAt:n-2700},
+    {id:'r08',name:'姥姥家疙瘩汤',category:'restaurant',lat:34.539,lng:113.837,address:'航空港区云港路润丰悦尚南门',rating:4,desc:'养胃疙瘩汤6大系列，铁锅焖面+家常小炒。家的味道，价格亲民。',review:'疙瘩汤暖胃又暖心，像姥姥做的味道。铁锅焖面也很香，家常菜价格实惠。',image:'',favorited:false,createdAt:n-2800},
+    {id:'r09',name:'豫盛和豫菜烩面',category:'restaurant',lat:34.542,lng:113.842,address:'航空港区长安路与迎宾大道交叉口',rating:4,desc:'酸菜烩面独具特色，地道河南烩面风味。汤鲜面筋道，港区老字号。',review:'酸菜烩面是特色！酸爽开胃，面条筋道。羊肉烩面也很赞，汤浓面香。',image:'',favorited:false,createdAt:n-2900},
+    {id:'r10',name:'功夫怪兽烧烤 (港区首店)',category:'restaurant',lat:34.536,lng:113.846,address:'航空港区锦荣悦汇城附近',rating:4,desc:'港区人气烧烤店，各类烤串+精酿啤酒，夜晚氛围好适合朋友聚会。',review:'烤串种类超多，羊肉串和烤生蚝必点！晚上约朋友撸串喝酒氛围绝佳。',image:'',favorited:false,createdAt:n-3000},
+    {id:'r11',name:'麻辣鲜鱼坊',category:'restaurant',lat:34.543,lng:113.840,address:'航空港区友谊路',rating:4,desc:'活鱼现杀现做，麻辣鲜香水煮鱼和酸菜鱼最受欢迎，性价比高。',review:'鱼是活的现杀非常新鲜！水煮鱼麻辣够味，分量足，两个人一条鱼吃撑了。',image:'',favorited:false,createdAt:n-3100},
+    {id:'r48',name:'郭全烧烤涮牛肚',category:'restaurant',lat:34.528,lng:113.858,address:'航空港区张庄镇张庄南街885号',rating:4,desc:'港区人气烧烤老店！烤串+涮牛肚是招牌，夜晚生意火爆。牛肚鲜嫩弹牙，秘制酱料蘸着吃。人均¥50-70。',review:'港区烧烤扛把子！牛肚涮得刚刚好，蘸上秘制酱料绝了。烤羊肉串也很香，深夜食堂的感觉。',image:'',favorited:false,createdAt:n-6800},
+    {id:'r49',name:'牛师傅羊排大虾火锅',category:'restaurant',lat:34.525,lng:113.852,address:'航空港区迎宾大道（近新郑机场）',rating:4,desc:'中牟风味第一名！羊排+大虾双拼火锅，汤底鲜香浓郁。羊排软烂脱骨，大虾鲜甜。人均¥48-80。',review:'羊排和大虾的组合太绝了！先啃羊排再涮菜，汤底鲜到不行。机场附近性价比最高的火锅。',image:'',favorited:false,createdAt:n-6900},
+    {id:'r50',name:'丰源烩面',category:'restaurant',lat:34.540,lng:113.841,address:'航空港区长安路与洞庭湖路交叉口',rating:4,desc:'港区手工烩面老店！菌香栗子牛腩烩面是独创，滋补白汤底浓郁。手工扯面筋道有嚼头。人均¥18-30。',review:'菌香牛腩烩面太香了！汤底浓郁面条筋道，牛肉分量给得足。港区吃烩面就来这家。',image:'',favorited:false,createdAt:n-7000},
+
+    // === 二七区/中原区 ===
+    {id:'r12',name:'梅果·云贵川Bistro',category:'restaurant',lat:34.760,lng:113.665,address:'二七区大卫城11楼11F-007号',rating:5,desc:'郑州年度漂亮店！人均约¥95。铜锅油焖鸡、黑松露菌子焖饭、黔南蘸水牛小串是招牌。云贵川风味，排队王。',review:'排队70分钟值了！铜锅油焖鸡土豆软糯拌饭绝了，黑松露焖饭必点。环境超适合拍照！',image:'',favorited:false,createdAt:n-3200},
+    {id:'r13',name:'曼玉融合餐厅 (大卫城店)',category:'restaurant',lat:34.760,lng:113.665,address:'二七区大卫城内',rating:5,desc:'郑州超火融合菜！约会首选。酸辣粉、蟹黄豆腐、榴莲芝士面包是招牌。环境精致。',review:'约会圣地！蟹黄豆腐嫩滑鲜美，榴莲芝士面包外酥里香。每道菜都精致好看。',image:'',favorited:false,createdAt:n-3300},
+    {id:'r14',name:'张福记 (陇海中路店)',category:'restaurant',lat:34.745,lng:113.655,address:'二七区陇海中路',rating:4,desc:'老牌江浙菜馆，口味正宗。东坡肉、龙井虾仁、叫花鸡是经典。环境雅致适合家宴。',review:'郑州少有的正宗江浙菜！东坡肉肥而不腻，龙井虾仁清新爽口。家庭聚餐好选择。',image:'',favorited:false,createdAt:n-3400},
+    {id:'r15',name:'葛记焖饼 (桐柏路店)',category:'restaurant',lat:34.760,lng:113.620,address:'中原区桐柏路',rating:5,desc:'源自清朝的非遗美食！坛子肉焖饼是招牌，入选大众点评必吃榜。人均¥40左右，性价比超高。',review:'非遗美食名不虚传！坛子肉焖饼香气扑鼻，饼软肉烂。每次回郑州都要来吃一碗！',image:'',favorited:false,createdAt:n-3500},
+    {id:'r16',name:'四厂烤包子',category:'restaurant',lat:34.760,lng:113.630,address:'中原区国棉四厂家属院内',rating:4,desc:'郑州经典小吃！国棉四厂里的烤包子，外酥里嫩馅料足。排队是常态。',review:'藏在老厂区里的美食！烤包子外皮酥脆，羊肉馅多汁。等20分钟也值得！',image:'',favorited:false,createdAt:n-3600},
+    {id:'r17',name:'溢香苑瓦罐 (交通路店)',category:'restaurant',lat:34.755,lng:113.660,address:'二七区交通路',rating:4,desc:'20年老店！酥肉瓦罐+莲夹瓦罐+千层烧饼是标配。人均¥30-50，老郑州人的味道记忆。',review:'吃了20年的老味道！酥肉瓦罐汤浓肉烂，千层烧饼蘸汤吃绝了。冬天来一罐太幸福。',image:'',favorited:false,createdAt:n-3700},
+    {id:'r75',name:'清真大茶盘子齐齐哈尔烤肉 (淮南街店)',category:'restaurant',lat:34.745,lng:113.648,address:'二七区淮南街与长江路交叉口',rating:4,desc:'2025必吃榜！东北齐齐哈尔烤肉，大茶盘子装肉分量豪迈。牛胸口/牛上脑/酸菜是灵魂搭配。人均¥70-100。',review:'东北烤肉就是实在！大茶盘子端上来吓一跳，肉新鲜分量大。酸菜配烤肉绝了，二七区烤肉天花板。',image:'',favorited:false,createdAt:n-9500},
+    {id:'r76',name:'煌粮小灶·精致家常菜 (碧云路店)',category:'restaurant',lat:34.740,lng:113.660,address:'二七区碧云路与长江路交叉口',rating:4,desc:'2025必吃榜！精致家常菜馆，每道菜像家里做的但更好吃。红烧肉/糖醋里脊/酸辣土豆丝。人均¥40-70。',review:'家常菜做到极致就是高级！红烧肉肥而不腻，糖醋里脊外酥里嫩。环境也精致，适合家庭聚餐。',image:'',favorited:false,createdAt:n-9600},
+    {id:'r77',name:'逍遥镇刘相五胡辣汤豆沫馆 (康复中街店)',category:'restaurant',lat:34.752,lng:113.660,address:'二七区康复中街与中原路交叉口',rating:4,desc:'2025必吃榜！正宗逍遥镇胡辣汤，汤底浓稠香辣料足。配水煎包/油条是河南人标准早餐。人均¥8-15。',review:'郑州最好喝的胡辣汤之一！料超级足，牛肉片大块。配刚出锅的水煎包，早晨的幸福就是这么简单。',image:'',favorited:false,createdAt:n-9700},
+    {id:'r78',name:'帖老大羊肉汤烩面烧烤 (康复后街总店)',category:'restaurant',lat:34.750,lng:113.655,address:'二七区康复后街与大学路交叉口',rating:4,desc:'2025必吃榜！30年老店，羊肉汤+烩面+烧烤一店三吃。羊肉现切现煮，烧烤炭火现烤。人均¥35-60。',review:'一店吃遍郑州味！羊肉汤白浓鲜，烩面筋道，烤串炭火香。聚餐首选，每个品类都做得好。',image:'',favorited:false,createdAt:n-9800},
+    {id:'r79',name:'百鲜煎包·牛肉面',category:'restaurant',lat:34.748,lng:113.653,address:'二七区大学路与中原路交叉口',rating:4,desc:'2025必吃榜！生煎包外皮酥脆底，牛肉面汤浓面筋道。水煎包+牛肉面是经典套餐。人均¥20-35。',review:'生煎包底部煎得金黄酥脆，咬开汤汁四溢！牛肉面也是真材实料，汤底熬得很浓。性价比无敌。',image:'',favorited:false,createdAt:n-9900},
+    {id:'r18',name:'须水邓记叫化鸡',category:'restaurant',lat:34.755,lng:113.640,address:'中原区须水镇',rating:4,desc:'河南老字号！烧鸡+猪蹄是招牌，年节必排长队。自制豆腐豆皮也超赞。人均¥50-80。',review:'老字号就是老字号！叫化鸡肉质鲜嫩入味，猪蹄软糯Q弹。过年必买，送人也体面。',image:'',favorited:false,createdAt:n-3800},
+    {id:'r80',name:'穆彦华逍遥镇胡辣汤 (岗坡路店)',category:'restaurant',lat:34.758,lng:113.615,address:'中原区岗坡路与伏牛路交叉口',rating:4,desc:'2025必吃榜！中原区胡辣汤扛把子，汤底浓稠料超足。牛肉胡辣汤+豆腐脑两掺是特色吃法。人均¥8-15。',review:'岗坡路最好喝的胡辣汤！料给得超大方，牛肉大块。两掺吃法绝了，香辣和嫩滑同时拥有。',image:'',favorited:false,createdAt:n-10000},
+    {id:'r81',name:'朱记滇味坊煳辣鱼 (淮河路店)',category:'restaurant',lat:34.748,lng:113.635,address:'中原区淮河路与桐柏路交叉口',rating:4,desc:'2025必吃榜！云南风味煳辣鱼，酸辣鲜香。乌江鱼现杀现做，煳辣汤底配薄荷。人均¥70-100。',review:'云南煳辣鱼在郑州也能吃到！酸辣过瘾，鱼肉嫩滑。薄荷是点睛之笔，吃完整个人都通透了。',image:'',favorited:false,createdAt:n-10100},
+    {id:'r82',name:'食欲老院子',category:'restaurant',lat:34.755,lng:113.625,address:'中原区秦岭路与陇海路交叉口',rating:4,desc:'老厂房改造的文艺餐厅，院子+红砖+绿植。创意融合菜，环境出片率极高。人均¥80-130。',review:'老院子改造得太有感觉了！红砖墙+爬藤+露台，怎么拍都好看。菜品精致有创意，约会必选。',image:'',favorited:false,createdAt:n-10200},
+    {id:'r83',name:'六八六粗粮小厨 (总店)',category:'restaurant',lat:34.760,lng:113.618,address:'中原区桐柏路与西站路交叉口',rating:4,desc:'2025必吃榜！粗粮细作健康菜，玉米饼/杂粮馍/野菜团子。铁锅炖菜+农家小炒。人均¥40-70。',review:'粗粮做得比细粮还好吃！玉米饼香软，野菜团子蘸酱绝了。健康又美味，吃撑了也没有负罪感。',image:'',favorited:false,createdAt:n-10300},
+    {id:'r19',name:'天堂鸟水煮鱼',category:'restaurant',lat:34.748,lng:113.685,address:'管城区凤凰路',rating:4,desc:'郑州老牌川菜，水煮鱼是招牌。鱼香茄子"太费米饭"。人均¥50-80。',review:'水煮鱼麻辣鲜香，鱼肉嫩滑！鱼香茄子真的费米饭，每次都要多吃一碗。老店味道始终如一。',image:'',favorited:false,createdAt:n-3900},
+    {id:'r20',name:'出云记',category:'restaurant',lat:34.750,lng:113.690,address:'管城区城东路',rating:4,desc:'藏在老院子里的网红菜馆，环境有格调，创意融合菜。入选大众点评必吃榜。',review:'老院子改的餐厅超有感觉！菜品精致有创意，每道都像艺术品。适合约会和小聚。',image:'',favorited:false,createdAt:n-4000},
+
+    // === 金水区 ===
+    {id:'r21',name:'华豫川酒家 (金水路店)',category:'restaurant',lat:34.767,lng:113.691,address:'金水区金水路',rating:5,desc:'郑州老牌高端川菜馆！太安鱼是招牌，人均¥80-150。麻辣到位不燥，宴请首选。',review:'郑州最好的川菜馆！太安鱼外酥里嫩，麻辣鲜香。环境好服务好，宴请倍有面子。',image:'',favorited:false,createdAt:n-4100},
+    {id:'r22',name:'野果 yeego (正弘城店)',category:'restaurant',lat:34.790,lng:113.689,address:'金水区正弘城内',rating:5,desc:'创意菜人气王！排队爆满的网红餐厅。菜品颜值高味道好，人均¥100左右。小红书大量打卡。',review:'排队太夸张但这颜值值了！每道菜都像摆拍道具，味道居然也很好！三刷不踩雷。',image:'',favorited:false,createdAt:n-4200},
+    {id:'r23',name:'礼部甄选 (正弘城店)',category:'restaurant',lat:34.790,lng:113.689,address:'金水区正弘城7楼L705号',rating:4,desc:'京菜/中餐精选，2024年底新开业。环境精致，适合约会和商务宴请。',review:'新开的京菜馆环境很棒！烤鸭皮脆肉嫩，其他菜品也很精致。正弘城7楼好选择。',image:'',favorited:false,createdAt:n-4300},
+    {id:'r24',name:'点都德 (正弘城店)',category:'restaurant',lat:34.790,lng:113.689,address:'金水区正弘城内',rating:5,desc:'霸榜郑州粤菜热门榜/好评榜/销量榜四榜第一！50+广州师傅现作早茶，金莎红米肠必点。人均¥84。',review:'郑州最好吃的粤菜没有之一！金莎红米肠绝了，虾饺皮薄馅大。广州师傅现做的就是不一样！',image:'',favorited:false,createdAt:n-4400},
+    {id:'r25',name:'郑州楚境餐厅 (英协路店)',category:'restaurant',lat:34.762,lng:113.712,address:'金水区英协路50-6号',rating:5,desc:'融合粤菜与信阳菜的高端餐厅，人均¥220-300。1387㎡由拙人营造设计，被誉为郑州"博物馆餐厅"。',review:'博物馆级别的装修！环境无可挑剔。信阳菜+粤菜融合很妙，商务宴请首选，就是贵有贵的道理。',image:'',favorited:false,createdAt:n-4500},
+    {id:'r26',name:'巴奴毛肚火锅 (概念餐厅)',category:'restaurant',lat:34.790,lng:113.690,address:'金水区花园路正弘城附近',rating:5,desc:'郑州起家火遍全国！毛肚一绝，对标海底捞。入选大众点评必吃榜多年。人均¥120-180。',review:'巴奴的毛肚真的无敌！七上八下刚刚好，脆嫩爽口。在郑州不吃巴奴等于没来过！',image:'',favorited:false,createdAt:n-4600},
+    {id:'r27',name:'鸟兰烧肉一番 (建业凯旋店)',category:'restaurant',lat:34.793,lng:113.695,address:'金水区花园路万达坊/建业凯旋广场',rating:4,desc:'小红书爆款日式烤肉！环境出片率极高，牛肉品质好。人均¥120-180。',review:'拍照太出片了！日式风格装修超美。烤肉品质好，牛舌和牛小排必点。约会圣地！',image:'',favorited:false,createdAt:n-4700},
+    {id:'r28',name:'赵长征炒虾尾手擀面',category:'restaurant',lat:34.805,lng:113.705,address:'金水区天伦路与黄家庵东路交叉口',rating:4,desc:'一晚上卖掉上万只虾尾！秘制酱料爆炒+现擀手擀面蘸汤。下午4点营业到凌晨3点。人均¥50-80。',review:'虾尾炒得太香了！手擀面蘸汤汁吃绝了。深夜来一碗，人间值得。就是人太多要排队。',image:'',favorited:false,createdAt:n-4800},
+    {id:'r29',name:'阿五黄河大鲤鱼 (纬三路店)',category:'restaurant',lat:34.770,lng:113.690,address:'金水区纬三路',rating:5,desc:'连续7年必吃榜！河南头牌菜，红烧黄河大鲤鱼有"身份标识"，仪式感满分。人均¥80-150。',review:'来郑州必吃！黄河大鲤鱼红烧太香了，鱼肉鲜嫩入味。仪式感满满，鲤鱼还有身份证！',image:'',favorited:false,createdAt:n-4900},
+    {id:'r51',name:'仲和小馆 (花园路店)',category:'restaurant',lat:34.786,lng:113.683,address:'金水区花园路与红专路交叉口',rating:5,desc:'21年老店，2025必吃榜！单店年接待17万人次。豫菜经典+创新，焖饼/烩面/红烧黄河鲤鱼。人均¥60-100。',review:'21年老味道一直没变！焖饼是招牌必点，饼软肉烂。黄河鲤鱼也做得很好，性价比超高。',image:'',favorited:false,createdAt:n-7100},
+    {id:'r52',name:'白堽羊肉 (红专路店)',category:'restaurant',lat:34.780,lng:113.685,address:'金水区红专路与经五路交叉口',rating:4,desc:'2025必吃榜！老牌羊肉馆，羊肉汤/羊肉烩面/手抓羊肉都是招牌。汤白肉嫩无膻味。人均¥35-60。',review:'羊肉汤熬得奶白浓郁，一点膻味没有！手抓羊肉蘸椒盐吃太香了，冬天来一碗暖到骨子里。',image:'',favorited:false,createdAt:n-7200},
+    {id:'r53',name:'虢国羊肉汤馆 (政二街店)',category:'restaurant',lat:34.773,lng:113.688,address:'金水区政二街与纬二路交叉口',rating:4,desc:'2025必吃榜！三代传承羊肉汤，汤底24小时不停火。羊肉烩面+羊肉汤+烤羊排。人均¥30-55。',review:'三代人的手艺都在这碗汤里了！汤浓肉香，烩面筋道。政二街的烟火气代表。',image:'',favorited:false,createdAt:n-7300},
+    {id:'r54',name:'景祥烩面 (政六街店)',category:'restaurant',lat:34.778,lng:113.695,address:'金水区政六街与红旗路交叉口',rating:4,desc:'2025必吃榜！老郑州烩面三大派之一，浓汤型代表。羊肉老汤底+手工扯面，配糖蒜吃最地道。人均¥25-40。',review:'老郑州人都认景祥！汤浓面筋道，糖蒜是灵魂。一碗烩面一瓶汽水，郑州人的标配午餐。',image:'',favorited:false,createdAt:n-7400},
+    {id:'r55',name:'水浒烤肉 (国贸总店)',category:'restaurant',lat:34.785,lng:113.680,address:'金水区花园路国贸360广场附近',rating:4,desc:'2025必吃榜！梁山好汉主题烤肉，大块肉炭火烤制。武松牛肉/李逵五花肉/秘制蘸料。人均¥80-120。',review:'大块吃肉大碗喝酒太爽了！武松牛肉烤出来外焦里嫩，蘸料是一绝。朋友聚会首选。',image:'',favorited:false,createdAt:n-7500},
+    {id:'r56',name:'龍園涮肉 (丰庆路店)',category:'restaurant',lat:34.800,lng:113.665,address:'金水区丰庆路与国基路交叉口',rating:4,desc:'2025必吃榜！传统铜锅涮肉，内蒙古羊肉+地道麻酱。清水铜锅涮出肉的本味。人均¥90-130。',review:'铜锅涮肉就是香！羊肉新鲜不膻，麻酱是秘制的。冬天来一锅涮肉配二锅头，太得劲了。',image:'',favorited:false,createdAt:n-7600},
+    {id:'r57',name:'ZAX BBQ (蓝堡湾店)',category:'restaurant',lat:34.790,lng:113.695,address:'金水区花园路东风路蓝堡湾',rating:4,desc:'2025必吃榜！正宗美式BBQ，烟熏牛胸肉+手撕猪肉+烤肋排。工业风装修，精酿啤酒搭配。人均¥120-180。',review:'郑州最正宗的美式烤肉！牛胸肉熏了十几个小时，入口即化。精酿啤酒配烤肉绝了。',image:'',favorited:false,createdAt:n-7700},
+    {id:'r58',name:'因味疆来·星空帐篷新疆小馆',category:'restaurant',lat:34.780,lng:113.688,address:'金水区红专路与经三路交叉口',rating:4,desc:'2025必吃榜！星空帐篷+新疆美食，沉浸式用餐体验。大盘鸡/红柳烤肉/手抓饭/馕包肉。人均¥80-120。',review:'坐在帐篷里吃新疆菜太有意思了！大盘鸡分量巨大，红柳烤肉香气扑鼻。晚上灯亮起超浪漫。',image:'',favorited:false,createdAt:n-7800},
+    {id:'r59',name:'毋米粥开煲 (英协路店)',category:'restaurant',lat:34.765,lng:113.710,address:'金水区英协路与凤鸣路交叉口',rating:4,desc:'2025必吃榜！顺德风味粥底火锅，毋米粥涮海鲜+牛肉。先喝粥再涮菜，鲜到掉眉毛。人均¥100-150。',review:'顺德粥底火锅在郑州也能吃到！粥底绵密鲜香，涮海鲜绝了。最后喝那碗粥是精华。',image:'',favorited:false,createdAt:n-7900},
+    {id:'r60',name:'银杏树海鲜餐厅 (金水路店)',category:'restaurant',lat:34.769,lng:113.705,address:'金水区金水路与未来路交叉口',rating:4,desc:'2025必吃榜！郑州高端海鲜餐厅，每日空运鲜活海鲜。帝王蟹/澳龙/东星斑。人均¥300-600。',review:'郑州吃海鲜的首选！食材新鲜程度不输沿海城市。帝王蟹三吃太豪华了，宴请倍有面子。',image:'',favorited:false,createdAt:n-8000},
+    {id:'r61',name:'上海恩记汤包馆 (东三街店)',category:'restaurant',lat:34.772,lng:113.667,address:'金水区东三街与红旗路交叉口',rating:4,desc:'2025必吃榜！正宗上海汤包，现点现蒸。鲜肉汤包/蟹粉汤包皮薄汁多，配一碗小馄饨。人均¥30-50。',review:'郑州最好吃的汤包！皮薄到透亮，咬开汤汁四溢。蟹粉的特别鲜，蘸姜醋吃完美。',image:'',favorited:false,createdAt:n-8100},
+    {id:'r62',name:'九味川香·麻婆豆腐 (国基路店)',category:'restaurant',lat:34.810,lng:113.672,address:'金水区国基路与索凌路交叉口',rating:4,desc:'2025必吃榜！专注川菜小馆，麻婆豆腐是招牌。麻辣鲜香嫩烫，配米饭绝了。人均¥40-70。',review:'麻婆豆腐做到了极致！麻辣鲜香嫩烫酥，拌饭吃三碗。其他川菜也地道，性价比超高。',image:'',favorited:false,createdAt:n-8200},
+
+    // === 郑东新区 ===
+    {id:'r30',name:'NEED创意韩国料理 (郑东万象城)',category:'restaurant',lat:34.789,lng:113.753,address:'郑东万象城内',rating:5,desc:'郑州韩料新宠！高级ins风装修。芝士辣炒鸡拉丝瀑布+碳烤牛肋条是招牌。拍照打卡圣地。',review:'芝士辣炒鸡拉丝太治愈了！碳烤牛肋条嫩到不行。服务员还会问要不要先拍照，太懂女生了！',image:'',favorited:false,createdAt:n-5000},
+    {id:'r31',name:'胡恰·景德江西菜 (郑东万象城)',category:'restaurant',lat:34.789,lng:113.753,address:'郑东万象城内',rating:5,desc:'华北首店！郑州首家排队排到爆的江西菜。南昌芋头牛肉锅¥98+胡恰辣鸡爪¥69是招牌。人均约¥100。',review:'江西辣太上头了！芋头牛肉锅绵密鲜香，辣鸡爪一抿就化。选郑州辣比较温和，江西辣慎选！',image:'',favorited:false,createdAt:n-5100},
+    {id:'r32',name:'牛排家 (郑东万象城)',category:'restaurant',lat:34.789,lng:113.753,address:'郑东万象城南区CL401',rating:5,desc:'河南首店！高端干式熟成厚切牛排。黑色调高级装修+户外露台，约会/纪念日/商务宴请首选。',review:'终于能在郑州吃到正宗干式熟成牛排了！外焦里嫩多汁，章鱼足Q弹。露台夜景绝美。',image:'',favorited:false,createdAt:n-5200},
+    {id:'r33',name:'城墙根茶馆 (CBD店)',category:'restaurant',lat:34.795,lng:113.750,address:'郑东新区CBD商务内环路',rating:5,desc:'连续6年必吃榜！茶馆+豫剧表演，明清古建美学空间。每晚7:30豫剧，6成顾客是年轻人。',review:'用一顿饭了解河南！喝茶听豫剧太有文化了。环境像穿越回古代，菜品精致。外地朋友来必带！',image:'',favorited:false,createdAt:n-5300},
+    {id:'r63',name:'阿庄新豫菜 (通泰路店)',category:'restaurant',lat:34.762,lng:113.720,address:'郑东新区通泰路与宏昌街交叉口',rating:5,desc:'6年必吃榜！郑州豫菜标杆，年销百万只虾锅贴。酥香嫩烤鸭/虾锅贴/三鲜铁锅蛋。人均¥80-130。',review:'六次上榜必吃榜不是盖的！烤鸭皮脆肉嫩，虾锅贴每个都有大虾仁。豫菜创新做得好，老味道新感觉。',image:'',favorited:false,createdAt:n-8300},
+    {id:'r64',name:'解家河南菜 (商鼎路店)',category:'restaurant',lat:34.767,lng:113.735,address:'郑东新区商鼎路与通泰路交叉口',rating:4,desc:'2025必吃榜！河南菜代表性品牌，红烧黄河鲤鱼/汴京烤鸭/豫式烩面。装修有河南文化特色。人均¥70-120。',review:'带外地朋友来吃河南菜首选！红烧黄河鲤鱼是招牌，烤鸭也不错。环境有河南特色文化墙。',image:'',favorited:false,createdAt:n-8400},
+    {id:'r65',name:'谷雨春红烧鲤鱼 (原盛国际店)',category:'restaurant',lat:34.770,lng:113.745,address:'郑东新区金水东路原盛国际',rating:4,desc:'2025必吃榜！专注红烧黄河鲤鱼，选用3斤以上生态鲤鱼。鱼肉鲜嫩入味，汤汁拌面绝配。人均¥80-120。',review:'红烧鲤鱼做得太入味了！鱼肉嫩滑不腥，汤汁浓郁拌面吃绝了。环境雅致适合家庭聚餐。',image:'',favorited:false,createdAt:n-8500},
+    {id:'r66',name:'满天星肉丝带底 (康宁街店)',category:'restaurant',lat:34.765,lng:113.742,address:'郑东新区康宁街与农业南路交叉口',rating:4,desc:'2025必吃榜！豫菜经典"肉丝带底"发源地，绿豆粉皮+猪肉丝+秘制酱汁。人均¥50-80。',review:'肉丝带底是郑州人的乡愁味道！粉皮Q弹肉丝嫩滑，酱汁是灵魂。这家是公认做得最好的。',image:'',favorited:false,createdAt:n-8600},
+    {id:'r67',name:'周記一擀一面皮 (宝龙广场店)',category:'restaurant',lat:34.780,lng:113.738,address:'郑东新区宝龙城市广场',rating:4,desc:'2025必吃榜！手工擀面皮+秘制红油，陕西风味。面皮筋道爽滑，红油香而不燥。人均¥20-35。',review:'擀面皮筋道到弹牙！红油香辣入味，夏天来一碗太爽了。量足价格实惠，工作餐首选。',image:'',favorited:false,createdAt:n-8700},
+    {id:'r68',name:'大智若鱼·新国风鱼火锅 (熙地港店)',category:'restaurant',lat:34.796,lng:113.723,address:'郑东新区熙地港购物中心内',rating:5,desc:'2025必吃榜！新国风鱼火锅开创者，环境如山水画卷。斑鱼片薄如蝉翼，3秒即熟。人均¥120-180。',review:'环境美到窒息！斑鱼片薄得透光，涮3秒就熟。汤底鲜到不行，像在画里吃火锅。约会圣地！',image:'',favorited:false,createdAt:n-8800},
+    {id:'r69',name:'久如香小龙虾·羊蝎子 (九如路店)',category:'restaurant',lat:34.798,lng:113.735,address:'郑东新区九如路与天赋路交叉口',rating:4,desc:'2025必吃榜！夏季小龙虾+冬季羊蝎子双招牌。十三香/蒜蓉/麻辣多种口味。人均¥100-160。',review:'夏天小龙虾个头大肉饱满，蒜蓉味的最香！冬天羊蝎子暖身，汤底浓郁。九如路夜宵圣地。',image:'',favorited:false,createdAt:n-8900},
+    {id:'r70',name:'蓉亭食贝 (永威木色店)',category:'restaurant',lat:34.793,lng:113.760,address:'郑东新区商务外环路永威木色购物中心',rating:4,desc:'2025必吃榜！精致川菜+海鲜，环境优雅。水煮鱼/辣子鸡/蒜蓉粉丝蒸扇贝。人均¥120-200。',review:'木色商场里环境最好的餐厅！川菜做得精致不粗糙，海鲜也新鲜。商务宴请和约会都合适。',image:'',favorited:false,createdAt:n-9000},
+
+    // === 经开区 (东北方向 ~15km) ===
+    {id:'r36',name:'老蔡记蒸饺 (经开区店)',category:'restaurant',lat:34.723,lng:113.852,address:'经开区航海东路与经开第三大街交叉口',rating:4,desc:'郑州百年老字号蒸饺！皮薄馅大汁多，配一碗馄饨是经典吃法。人均¥25-40。',review:'百年老字号不是盖的！蒸饺皮薄到透亮，咬一口汤汁四溢。馄饨汤鲜味美，绝配。',image:'',favorited:false,createdAt:n-5600},
+    {id:'r37',name:'经开区老胡家牛肉汤',category:'restaurant',lat:34.727,lng:113.858,address:'经开区经开第八大街',rating:4,desc:'经开区口碑牛肉汤馆，汤头熬制8小时以上。牛肉分量足，配饼吃最香。人均¥20-35。',review:'汤浓肉多！牛肉汤熬得白白的，撒上葱花太香了。饼泡汤里吃，冬天来一碗暖到骨子里。',image:'',favorited:false,createdAt:n-5700},
+    {id:'r71',name:'满芳兰庭羊肉汤烩面 (第三大街店)',category:'restaurant',lat:34.722,lng:113.851,address:'经开区经开第三大街与航海东路交叉口',rating:4,desc:'2025必吃榜！经开区口碑羊肉汤馆，凌晨4点开熬汤底。羊肉烩面+羊肉汤+烤羊排。人均¥30-55。',review:'经开区最好的羊肉汤！汤白如奶，羊肉嫩滑。烩面筋道，配糖蒜吃太得劲了。清晨来一碗元气满满。',image:'',favorited:false,createdAt:n-9100},
+    // === 管城区 (正北方向 ~18km) ===
+    {id:'r40',name:'顺城街羊肉汤馆',category:'restaurant',lat:34.753,lng:113.670,address:'管城区顺城街（北顺城街美食街）',rating:4,desc:'管城老街30年羊肉汤！清晨现宰现熬，汤白肉嫩。配火烧馍是最地道吃法。人均¥20-40。',review:'管城老街坊都认这家！羊肉汤熬得奶白浓郁，一点不膻。火烧馍撕碎了泡汤，香迷糊了。',image:'',favorited:false,createdAt:n-6000},
+    {id:'r41',name:'管城清真马豫兴桶子鸡',category:'restaurant',lat:34.751,lng:113.672,address:'管城区清真寺街',rating:5,desc:'百年清真老字号！桶子鸡皮脆肉嫩有嚼劲，冷吃最佳。过年过节必排队。人均¥40-60。',review:'郑州最好吃的桶子鸡！鸡皮Q弹鸡肉紧实有嚼劲，越嚼越香。买一只带回家下酒完美。',image:'',favorited:false,createdAt:n-6100},
+    {id:'r72',name:'宋老三苏肉羊肉汤老店',category:'restaurant',lat:34.752,lng:113.671,address:'管城区法院东街与清真寺街交叉口',rating:4,desc:'2025必吃榜！管城老街20年小酥肉专门店。酥肉炸得金黄，羊肉汤配酥肉是经典吃法。人均¥25-40。',review:'小酥肉炸得外酥里嫩，泡羊肉汤里吃绝了！管城老街坊的早餐记忆，早上来一碗满血复活。',image:'',favorited:false,createdAt:n-9200},
+    {id:'r73',name:'清真·海记牛肚王 (郑州总店)',category:'restaurant',lat:34.754,lng:113.670,address:'管城区北顺城街美食街',rating:4,desc:'2025必吃榜！管城清真名店，牛肚火锅一绝。新鲜牛肚现切现涮，秘制麻酱+辣椒油蘸料。人均¥70-100。',review:'牛肚新鲜到弹牙！涮个十几秒就熟，蘸麻酱吃太香了。顺城街美食街的排队王。',image:'',favorited:false,createdAt:n-9300},
+    {id:'r74',name:'肖家饸饹面总店',category:'restaurant',lat:34.756,lng:113.668,address:'管城区西大街与南大街交叉口',rating:4,desc:'2025必吃榜！郑州饸饹面代表，荞麦面现压现煮。牛肉饸饹面+羊肉饸饹面，汤浓面筋道。人均¥18-30。',review:'饸饹面筋道爽滑，汤底浓郁！荞麦面健康又好吃，牛肉给得大方。管城老味道。',image:'',favorited:false,createdAt:n-9400},
+    // === 惠济区 (远北方向 ~35km) ===
+    {id:'r42',name:'黄河渔村 (惠济总店)',category:'restaurant',lat:34.875,lng:113.615,address:'惠济区花园口镇（近黄河大堤）',rating:4,desc:'黄河岸边吃黄河鲤鱼！红烧黄河大鲤鱼+农家地锅鸡+黄河滩野菜。人均¥70-120。',review:'坐在黄河边吃鱼太美了！鲤鱼是现从黄河捞的，肉质鲜嫩。秋天来还能看黄河落日。',image:'',favorited:false,createdAt:n-6200},
+    {id:'r43',name:'惠济桥头烩面',category:'restaurant',lat:34.868,lng:113.618,address:'惠济区开元路惠济桥头',rating:4,desc:'惠济区老牌烩面馆，手工扯面+羊骨熬汤。面条宽厚筋道汤头浓郁。人均¥18-30。',review:'惠济桥头的老味道！手工扯面就是比机器面好吃，筋道有嚼劲。羊汤浓郁，一碗下去满血复活。',image:'',favorited:false,createdAt:n-6300},
+    // === 高新区 (西北方向 ~30km) ===
+    {id:'r45',name:'高新区瓦库·茶馆火锅',category:'restaurant',lat:34.806,lng:113.582,address:'高新区科学大道西段',rating:4,desc:'茶馆+火锅新模式！古色古香的环境里吃火锅，毛肚+茶馆特调茶饮。人均¥80-120。',review:'环境太有格调了！在茶馆里吃火锅感觉很奇妙。毛肚新鲜，茶饮解腻。适合招待朋友。',image:'',favorited:false,createdAt:n-6500},
+    // === 龙湖镇 (西南方向 ~20km) ===
+    {id:'r46',name:'龙湖老赵家烩面',category:'restaurant',lat:34.430,lng:113.670,address:'新郑市龙湖镇双湖大道',rating:4,desc:'龙湖镇老字号烩面！三代传承手工扯面，羊肉汤底浓郁。南来北往的司机都来吃。人均¥18-30。',review:'龙湖镇最好吃的烩面！汤头浓郁面条筋道，羊肉分量给得足。配糖蒜吃，太得劲了！',image:'',favorited:false,createdAt:n-6600},
+  ];
+  const e=[// entertainment
+    {id:'e01',name:'奥斯卡影城 (锦荣悦汇城)',category:'entertainment',lat:34.535,lng:113.847,address:'航空港区锦荣悦汇城内',rating:4,desc:'港区主力影院，多厅配置放映质量好。支持在线选座购票。',review:'港区看电影首选，厅不算很大但设备不错。周末建议提前买票，热门场次容易满座。',image:'',favorited:false,createdAt:n-5400},
+    {id:'e02',name:'歌迷KTV (锦荣悦汇城)',category:'entertainment',lat:34.535,lng:113.848,address:'航空港区锦荣悦汇城内',rating:4,desc:'曲库全音响好，多种主题包厢。朋友聚会唱歌放松好去处。',review:'音响效果不错，歌单更新及时。团购套餐性价比高，朋友聚会常来。',image:'',favorited:false,createdAt:n-5500},
+    {id:'e03',name:'聚美空港竖屏电影基地',category:'entertainment',lat:34.539,lng:113.846,address:'航空港区（近锦荣悦汇城）',rating:4,desc:'4万㎡影视拍摄基地，20+专业场景（医院/公安局/KTV等），日均8-12个剧组。可参观短剧制作拍照打卡。',review:'太有意思了！第一次近距离看短剧拍摄，场景超逼真。喜欢刷短剧的朋友一定要来打卡！',image:'',favorited:false,createdAt:n-5600},
+    {id:'e04',name:'长安路夜市',category:'entertainment',lat:34.542,lng:113.839,address:'航空港区长安路（洞庭湖路-大航路段）',rating:4,desc:'港区夜经济示范区！烤串/臭豆腐/糖葫芦/特色面食等小吃聚集，烟火气十足。',review:'港区最有烟火气的地方！烤面筋臭豆腐铁板鱿鱼...逛一圈吃饱花不了多少钱。夏天晚上特别热闹。',image:'',favorited:false,createdAt:n-5700},
+    {id:'e05',name:'绿轴公园',category:'entertainment',lat:34.539,lng:113.842,address:'航空港区凌烟街-凌风街之间',rating:5,desc:'港区"城市客厅"，坡地草坪+沙坑儿童乐园。散步遛娃喝咖啡发呆好去处。',review:'港区最美的公园！草坪很大适合野餐，儿童游乐区孩子玩得不亦乐乎。周末来散步很惬意。',image:'',favorited:false,createdAt:n-5800},
+    {id:'e06',name:'黄金时代健身 (锦荣广场)',category:'entertainment',lat:34.537,lng:113.848,address:'航空港区锦荣广场内',rating:3,desc:'设备齐全的健身房，有氧区+力量区+游泳池。港区居民健身选择。',review:'设备还算新，泳池不错。高峰期人会比较多，建议错峰去。',image:'',favorited:false,createdAt:n-5900},
+    // === 经开区 (东北 ~15km) ===
+    {id:'e07',name:'经开中心广场',category:'entertainment',lat:34.724,lng:113.850,address:'经开区经开第八大街与航海东路交叉口',rating:4,desc:'经开区城市客厅！大型下沉广场+音乐喷泉+健身步道。晚上灯光秀很漂亮。',review:'经开区晚上最热闹的地方！喷泉灯光秀超美，好多人在跳广场舞和遛娃。跑步一圈很舒服。',image:'',favorited:false,createdAt:n-6000},
+    // === 中牟方向 (正东 ~20km) ===
+    {id:'e09',name:'郑州方特欢乐世界',category:'entertainment',lat:34.733,lng:114.005,address:'中牟县郑开大道与人文路交叉口（中牟绿博园旁）',rating:5,desc:'中原最大主题乐园！飞越极限+恐龙危机+聊斋+水上乐园。6大主题区，玩一天不够。',review:'郑州最好玩的游乐园！飞越极限太刺激了必玩。暑假带娃来能玩一整天，就是排队有点久。',image:'',favorited:false,createdAt:n-6200},
+    // === 新郑方向 (正南 ~15km) ===
+    {id:'e10',name:'黄帝故里景区',category:'entertainment',lat:34.398,lng:113.730,address:'新郑市轩辕路（黄帝故里）',rating:5,desc:'全球华人寻根圣地！中华人文始祖轩辕黄帝出生地。每年三月三举办盛大拜祖大典。',review:'每个华人都该来看看！景区气势恢宏，拜祖大典特别震撼。了解华夏文明起源的好地方。',image:'',favorited:false,createdAt:n-6300},
+    // === 惠济区 (远北 ~35km) ===
+    {id:'e11',name:'郑州黄河国家湿地公园',category:'entertainment',lat:34.910,lng:113.625,address:'惠济区黄河大堤（花园口景区）',rating:5,desc:'国家级湿地保护区！黄河滩涂+芦苇荡+候鸟天堂。骑行+露营+观鸟+看黄河落日。免费开放。',review:'郑州最美的自然景观！黄河滩涂一望无际，秋天芦苇金黄拍照绝美。周末骑行露营超惬意。',image:'',favorited:false,createdAt:n-6400},
+    // === 高新区 (西北 ~30km) ===
+    {id:'e12',name:'天健湖公园',category:'entertainment',lat:34.812,lng:113.575,address:'高新区枫香街与创新大道交叉口',rating:4,desc:'高新区最美人工湖公园！环湖绿道+沙滩+儿童乐园。适合跑步骑行遛娃。',review:'高新区最漂亮的公园！湖面开阔环湖跑步太舒服了。人工沙滩孩子能玩一下午，停车免费。',image:'',favorited:false,createdAt:n-6500},
+    // === 龙湖镇 (西南 ~20km) ===
+    {id:'e13',name:'西泰山风景区',category:'entertainment',lat:34.420,lng:113.660,address:'新郑市龙湖镇（西泰山村）',rating:4,desc:'郑州近郊登山好去处！千级台阶登顶俯瞰郑州。山下有特色农家乐+采摘园。',review:'离郑州最近的爬山去处！山顶视野开阔天气好能看到市区。下山吃农家饭完美周末。',image:'',favorited:false,createdAt:n-6600},
+    // === 中原区 (西北偏西 ~28km) ===
+    {id:'e14',name:'郑州植物园',category:'entertainment',lat:34.745,lng:113.595,address:'中原区西四环路（近陇海快速路）',rating:4,desc:'900亩城市绿洲！樱花林+牡丹园+温室热带馆+盆景园。春季花开季节最美，免费入园。',review:'郑州最值得逛的公园！春天樱花和牡丹开的时候太美了。温室热带植物馆很有趣，拍照超出片。',image:'',favorited:false,createdAt:n-6700},
+    // === 新增娱乐 (2025 必打卡) ===
+    {id:'e15',name:'只有河南·戏剧幻城',category:'entertainment',lat:34.755,lng:113.970,address:'中牟县郑开大道与紫寰路交叉口（近方特）',rating:5,desc:'中国首座沉浸式戏剧主题公园！3大主剧场+18个小剧场，622亩棋盘格布局。王潮歌导演，一天看不完。抖音话题播放量破百亿。',review:'震撼到说不出话！每个剧场都是艺术品，演员就在你身边表演。建议买两日票不然看不完，来郑州必打卡No.1！',image:'',favorited:false,createdAt:n-10400},
+    {id:'e16',name:'思念果岭·北欧童话小镇',category:'entertainment',lat:34.880,lng:113.575,address:'惠济区江山路思念果岭国际社区内',rating:5,desc:'郑州版"哥本哈根"！风车城堡+森林图书馆+霍比特人小屋+天鹅湖。免费开放，拍照出片率100%。',review:'不用出国也能拍北欧风！风车城堡太美了，森林图书馆超有feel。喂小羊和天鹅湖是孩子最爱，周末人比较多。',image:'',favorited:false,createdAt:n-10500},
+    {id:'e17',name:'北龙湖湿地公园',category:'entertainment',lat:34.815,lng:113.732,address:'郑东新区龙湖内环路（龙湖金融岛旁）',rating:5,desc:'郑州"小三亚"！金色沙滩+浅水区+环湖绿道。露营/玩沙/骑行/看日落。免费开放，周末人气爆棚。',review:'郑州最美的日落就在北龙湖！沙滩很适合遛娃，环湖骑行太惬意了。傍晚金色光线拍照绝美。',image:'',favorited:false,createdAt:n-10600},
+    {id:'e18',name:'郑州之林',category:'entertainment',lat:34.790,lng:113.735,address:'郑东新区CBD商务外环路（近会展中心）',rating:4,desc:'CBD核心绿地公园！大片草坪+白沙地+树林步道。放风筝/野餐/遛娃/晨跑，城市中的森林。',review:'CBD的绿肺！草地超大随便躺，白沙地孩子能玩一下午。春天放风筝秋天看银杏，城市里最治愈的角落。',image:'',favorited:false,createdAt:n-10700},
+    {id:'e19',name:'健康路夜市',category:'entertainment',lat:34.773,lng:113.668,address:'金水区健康路（黄河路-优胜南路段）',rating:4,desc:'郑州最火夜市！鸭肠10元30串/姐弟俩土豆粉/炒凉粉/杏仁茶。每晚6点到凌晨，整条街都是烟火气。',review:'郑州夜生活的灵魂！鸭肠便宜又好吃，姐弟俩土豆粉是青春回忆。夏天晚上人山人海，这才是郑州的味道！',image:'',favorited:false,createdAt:n-10800},
+    {id:'e20',name:'汝河小区夜市',category:'entertainment',lat:34.748,lng:113.618,address:'中原区汝河路与伏牛路交叉口汝河小区内',rating:4,desc:'郑州老牌夜市！付记杏仁茶15元/碗+老赵炒凉粉+李姐烤面筋。30年历史，老郑州人的深夜食堂。',review:'杏仁茶是郑州一绝！付记的料超级足，冬天来一碗暖到心。炒凉粉和烤面筋也超赞，老夜市才有这种味道。',image:'',favorited:false,createdAt:n-10900},
+    {id:'e21',name:'商都遗址博物院',category:'entertainment',lat:34.752,lng:113.671,address:'管城区东大街与城东路交叉口',rating:5,desc:'3600年商代都城遗址！沉浸式数字展厅+全息投影+考古现场。免费预约参观，了解郑州的前世今生。',review:'原来郑州是3600年前的商朝都城！数字展厅太震撼了，全息影像还原商代生活。带娃了解历史超棒的。',image:'',favorited:false,createdAt:n-11000},
+    {id:'e22',name:'阜民里',category:'entertainment',lat:34.751,lng:113.667,address:'管城区南学街与职工路交叉口',rating:4,desc:'管城老街区焕新！红砖瓦房+阳台音乐会+非遗文创+潮流小店。城市更新标杆，每个角落都是风景。',review:'老郑州的新灵魂！红砖老房子改得太有味道了。周末有阳台音乐会，坐在路边听歌喝咖啡太惬意了。',image:'',favorited:false,createdAt:n-11100},
+    {id:'e23',name:'黄河滩地公园',category:'entertainment',lat:34.925,lng:113.640,address:'惠济区黄河大堤（花园口东段）',rating:4,desc:'66公里彩色慢行系统！黄河滩涂景观+采摘园+观鸟台+露营地。骑行/跑步/遛娃/烧烤，周末微度假首选。免费开放。',review:'黄河边的慢生活太美好了！彩色骑行道沿着河堤延伸，秋天芦苇荡金黄一片。带上帐篷能呆一整天。',image:'',favorited:false,createdAt:n-11200},
+    {id:'e24',name:'蝶湖公园',category:'entertainment',lat:34.710,lng:113.710,address:'经开区潮河路与第十一大街交叉口',rating:4,desc:'郑州"小洱海"！湖面开阔+沙滩+草坪+骑行道。可炭火烧烤露营，浅湖区可玩水。最近超火的周末露营地。',review:'郑州最适合露营的公园！湖边沙滩太有洱海的感觉了。炭火烧烤+帐篷+玩水，完美的周末。' ,image:'',favorited:false,createdAt:n-11300},
+  ];
+  return [...m,...r,...e];
+}
+
+let places=loadPlaces(),currentFilter='all',favFilterOnly=false,sortMode='newest',editingId=null,pendingDeleteId=null,markers={};
+savePlaces();
+
+// ==================== DISTANCE ====================
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function getRoute(p){
+  const d=haversine(HOME_LAT,HOME_LNG,p.lat,p.lng);
+  if(d<0.05)return{walkMin:1,driveMin:1,distKm:0};
+  return{walkMin:Math.max(1,Math.round(d/5*60)),driveMin:Math.max(1,Math.round(d/30*60)),distKm:+d.toFixed(1)};
+}
+function fmtRoute(p){
+  const r=getRoute(p);let dm=r.driveMin,wm=r.walkMin;
+  if(p._ds)dm=Math.round(p._ds/60);if(p._ws)wm=Math.round(p._ws/60);
+  const dl=dm>=60?Math.floor(dm/60)+'h'+(dm%60||'')+'min':dm+'分钟';
+  const wl=wm>=60?Math.floor(wm/60)+'h'+(wm%60||'')+'min':wm+'分钟';
+  return{driveLabel:dl,walkLabel:wl,distKm:r.distKm,driveMin:dm,walkMin:wm};
+}
+async function enrichRoutes(){
+  const batch=places.filter(p=>!p._enriched);
+  for(let i=0;i<batch.length;i+=3){
+    const g=batch.slice(i,i+3);
+    await Promise.allSettled(g.map(async p=>{
+      try{const r=await fetch('https://router.project-osrm.org/route/v1/driving/'+HOME_LNG+','+HOME_LAT+';'+p.lng+','+p.lat+'?overview=false',{signal:AbortSignal.timeout(3000)});if(r.ok){const d=await r.json();if(d.routes?.[0]?.duration)p._ds=d.routes[0].duration}}catch(e){}
+      try{const r=await fetch('https://router.project-osrm.org/route/v1/walking/'+HOME_LNG+','+HOME_LAT+';'+p.lng+','+p.lat+'?overview=false',{signal:AbortSignal.timeout(3000)});if(r.ok){const d=await r.json();if(d.routes?.[0]?.duration)p._ws=d.routes[0].duration}}catch(e){}
+      p._enriched=true;
+    }));
+  }
+  renderCards();
+}
+
+// ==================== MAP ====================
+const ZG_SW=[34.40,113.35],ZG_NE=[34.95,114.00];
+const map=L.map('map',{center:[HOME_LAT,HOME_LNG],zoom:11,minZoom:9,maxZoom:18,maxBounds:[ZG_SW,ZG_NE],maxBoundsViscosity:0.8,zoomControl:true,zoomSnap:0.25,zoomDelta:0.5,wheelPxPerZoomLevel:40,bounceAtZoomLimits:false});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',maxZoom:19}).addTo(map);
+
+const homeIcon=L.divIcon({className:'',html:'<div style="background:#E8577B;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid white;box-shadow:0 3px 12px rgba(232,87,123,0.5);">🏠</div>',iconSize:[36,36],iconAnchor:[18,18]});
+L.marker([HOME_LAT,HOME_LNG],{icon:homeIcon}).addTo(map).bindPopup('<b>🏠 空港辰院一期达园</b><br>你的家 📍<br><small>所有距离从此处计算</small>').bindTooltip('🏠 我的家',{permanent:true,direction:'top',offset:[0,-22]});
+
+// district boundaries
+const DS={color:'#9333EA',weight:4,opacity:0.95,fillOpacity:0.05,fillColor:'#9333EA',dashArray:'8 5'};
+const DH={color:'#A855F7',weight:6,opacity:1,fillOpacity:0.10,fillColor:'#A855F7'};
+let dLayer;
+async function loadDistricts(){
+  try{
+    const r=await fetch('https://geo.datav.aliyun.com/areas_v3/bound/410100_full.json',{signal:AbortSignal.timeout(8000)});
+    if(!r.ok)return;
+    const g=await r.json();
+    dLayer=L.geoJSON(g,{style:DS,onEachFeature:(f,l)=>{l.bindTooltip(f.properties.name||'',{sticky:true,direction:'center'});l.on('mouseover',()=>l.setStyle(DH));l.on('mouseout',()=>l.setStyle(DS));}}).addTo(map);
+    console.log('✅ 郑州区县边界已加载');
+  }catch(e){console.log('⚠️ 区县边界加载失败');}
+}
+
+map.on('click',function(e){
+  if(document.getElementById('addModal').style.display==='flex'){
+    document.getElementById('formLat').value=e.latlng.lat.toFixed(6);
+    document.getElementById('formLng').value=e.latlng.lng.toFixed(6);
+    showToast('✅ 坐标：'+e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5));
+  }
+});
+
+// ==================== MARKERS ====================
+function createMarker(p){
+  const icon=L.divIcon({className:'',html:'<div class="custom-marker'+(p.favorited?' favorited':'')+'"></div>',iconSize:[32,32],iconAnchor:[16,32]});
+  const m=L.marker([p.lat,p.lng],{icon,bubblingMouseEvents:false}).addTo(map).bindPopup(buildPopup(p));
+  m.on('click',()=>highlightCard(p.id));
+  markers[p.id]=m;
+}
+function buildPopup(p){
+  const cat={restaurant:'🍽️ 餐厅',mall:'🛍️ 商场',entertainment:'🎮 娱乐'}[p.category];
+  const rt=fmtRoute(p);
+  let h='<div style="min-width:220px;font-family:PingFang SC,sans-serif;">';
+  h+='<b style="font-size:15px;">'+esc(p.name)+'</b><span style="margin-left:8px;font-size:11px;background:#FFF0F3;color:#E8577B;padding:2px 6px;border-radius:8px;">'+cat+'</span>';
+  h+='<div style="margin-top:4px;font-size:13px;color:#6B6B80;">'+'⭐'.repeat(p.rating)+' '+p.rating+'分</div>';
+  h+='<div style="margin-top:4px;font-size:11px;color:#9333EA;">🚗 '+rt.driveLabel+' | 🚶 '+rt.walkLabel+' | 📍 '+rt.distKm+'km</div>';
+  if(p.address)h+='<div style="margin-top:4px;font-size:12px;color:#999;">📍 '+esc(p.address)+'</div>';
+  h+='<div style="margin-top:8px;"><button onclick="openDetailModal(\''+p.id+'\')" style="padding:5px 14px;border:none;border-radius:8px;background:#E8577B;color:white;cursor:pointer;font-size:12px;font-family:inherit;">查看详情</button></div></div>';
+  return h;
+}
+function refreshMarkers(){Object.values(markers).forEach(m=>map.removeLayer(m));markers={};places.forEach(createMarker);}
+
+// ==================== CARDS ====================
+function filtered(){
+  let f=[...places];
+  if(currentFilter!=='all')f=f.filter(p=>p.category===currentFilter);
+  if(favFilterOnly)f=f.filter(p=>p.favorited);
+  const q=document.getElementById('searchInput').value.trim().toLowerCase();
+  if(q)f=f.filter(p=>p.name.toLowerCase().includes(q)||p.address.toLowerCase().includes(q)||p.desc.toLowerCase().includes(q));
+  if(sortMode==='distance')f.sort((a,b)=>haversine(HOME_LAT,HOME_LNG,a.lat,a.lng)-haversine(HOME_LAT,HOME_LNG,b.lat,b.lng));
+  else f.sort((a,b)=>b.createdAt-a.createdAt);
+  return f;
+}
+function renderCards(){
+  const c=document.getElementById('cardList'),fl=filtered();
+  if(!fl.length){c.innerHTML='<div class="empty-state"><div class="icon">📍</div><p>暂无地点</p><p style="font-size:12px;">点击右上角"添加地点"开始吧~</p></div>';return;}
+  c.innerHTML=fl.map(p=>{
+    const cl={restaurant:'🍽️ 餐厅',mall:'🛍️ 商场',entertainment:'🎮 娱乐'}[p.category];
+    const cc={restaurant:'badge-restaurant',mall:'badge-mall',entertainment:'badge-entertainment'}[p.category];
+    const rt=fmtRoute(p);
+    return '<div class="card" id="card-'+p.id+'" onclick="focusPlace(\''+p.id+'\')">'
+      +'<span class="fav-icon'+(p.favorited?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+p.id+'\')">'+(p.favorited?'❤️':'🤍')+'</span>'
+      +'<div class="card-header"><span class="card-title">'+esc(p.name)+'</span><span class="card-badge '+cc+'">'+cl+'</span></div>'
+      +'<div class="card-meta"><span class="stars">'+'⭐'.repeat(p.rating)+'</span><span>'+p.rating+'分</span></div>'
+      +'<div class="card-route"><span>🚗 '+rt.driveLabel+'</span><span>🚶 '+rt.walkLabel+'</span><span>📍 '+rt.distKm+'km</span></div>'
+      +(p.address?'<div class="card-address">📍 '+esc(p.address)+'</div>':'')
+      +(p.desc?'<div class="card-desc">'+esc(p.desc)+'</div>':'')
+      +'<div class="card-actions">'
+      +'<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openDetailModal(\''+p.id+'\')">📋 详情</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openEditModal(\''+p.id+'\')">✏️ 编辑</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();askDelete(\''+p.id+'\')">🗑️ 删除</button>'
+      +'</div></div>';
+  }).join('');
+  document.getElementById('favChip').classList.toggle('active',favFilterOnly);
+}
+function highlightCard(id){
+  document.querySelectorAll('.card.highlight').forEach(c=>c.classList.remove('highlight'));
+  const el=document.getElementById('card-'+id);
+  if(el){el.classList.add('highlight');el.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>el.classList.remove('highlight'),2000);}
+}
+function focusPlace(id){
+  const p=places.find(x=>x.id===id);if(!p)return;
+  map.setView([p.lat,p.lng],16,{animate:true,duration:0.3});
+  if(markers[id])markers[id].openPopup();
+  highlightCard(id);
+}
+
+// ==================== ACTIONS ====================
+function toggleFavorite(id){const p=places.find(x=>x.id===id);if(!p)return;p.favorited=!p.favorited;savePlaces();refreshMarkers();renderCards();showToast(p.favorited?'❤️ 已收藏':'已取消收藏');}
+function askDelete(id){pendingDeleteId=id;document.getElementById('confirmMsg').textContent='确定要删除「'+places.find(p=>p.id===id)?.name+'」吗？';document.getElementById('confirmDialog').style.display='flex';}
+function hideConfirm(){document.getElementById('confirmDialog').style.display='none';pendingDeleteId=null;}
+function confirmDelete(){if(!pendingDeleteId)return;const id=pendingDeleteId;places=places.filter(p=>p.id!==id);if(markers[id]){map.removeLayer(markers[id]);delete markers[id];}savePlaces();renderCards();hideConfirm();if(document.getElementById('detailModal').style.display==='flex')closeDetailModal();showToast('🗑️ 已删除');}
+function toggleSort(){sortMode=sortMode==='newest'?'distance':'newest';const el=document.getElementById('sortChip');el.textContent=sortMode==='distance'?'📍 由近到远':'🕐 最新';el.classList.toggle('active',sortMode==='distance');renderCards();}
+function toggleFavFilter(){favFilterOnly=!favFilterOnly;const b=document.getElementById('btnShowFavorites');b.textContent=favFilterOnly?'❤️ 显示全部':'❤️ 只看收藏';b.classList.toggle('active',favFilterOnly);renderCards();}
+function setFilter(f,el){currentFilter=f;document.querySelectorAll('.filter-chips .chip:not(.fav-filter)').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderCards();}
+
+// ==================== MODALS ====================
+function openAddModal(){editingId=null;document.getElementById('modalTitle').textContent='添加新地点';['formName','formImage','formAddress','formPhone','formDesc','formReview','formLat','formLng'].forEach(id=>document.getElementById(id).value='');document.getElementById('formCategory').value='restaurant';document.getElementById('formRating').value='4';document.getElementById('addModal').style.display='flex';}
+function openEditModal(id){const p=places.find(x=>x.id===id);if(!p)return;editingId=id;document.getElementById('modalTitle').textContent='编辑地点';document.getElementById('formName').value=p.name;document.getElementById('formCategory').value=p.category;document.getElementById('formRating').value=p.rating;document.getElementById('formAddress').value=p.address||'';document.getElementById('formPhone').value=p.phone||'';document.getElementById('formImage').value=p.image||'';document.getElementById('formDesc').value=p.desc||'';document.getElementById('formReview').value=p.review||'';document.getElementById('formLat').value=p.lat;document.getElementById('formLng').value=p.lng;document.getElementById('addModal').style.display='flex';}
+function closeModal(){document.getElementById('addModal').style.display='none';editingId=null;}
+function savePlace(){
+  const name=document.getElementById('formName').value.trim(),lat=parseFloat(document.getElementById('formLat').value),lng=parseFloat(document.getElementById('formLng').value);
+  if(!name){showToast('⚠️ 请输入地点名称');return;}
+  if(isNaN(lat)||isNaN(lng)){showToast('⚠️ 请点击地图获取坐标');return;}
+  const ex=editingId?places.find(p=>p.id===editingId):null;
+  const data={id:editingId||'u'+Date.now().toString(36),name,category:document.getElementById('formCategory').value,rating:parseInt(document.getElementById('formRating').value),address:document.getElementById('formAddress').value.trim(),phone:document.getElementById('formPhone').value.trim(),image:document.getElementById('formImage').value.trim(),desc:document.getElementById('formDesc').value.trim(),review:document.getElementById('formReview').value.trim(),lat,lng,favorited:ex?.favorited||false,createdAt:ex?.createdAt||Date.now()};
+  if(editingId)places=places.map(p=>p.id===editingId?data:p);else places.push(data);
+  savePlaces();refreshMarkers();renderCards();closeModal();
+  showToast(editingId?'✅ 已更新':'✅ 已添加');
+}
+
+function openDetailModal(id){
+  const p=places.find(x=>x.id===id);if(!p)return;
+  const cl={restaurant:'🍽️ 餐厅',mall:'🛍️ 商场',entertainment:'🎮 娱乐'}[p.category];
+  const ci={restaurant:'🍽️',mall:'🛍️',entertainment:'🎮'}[p.category];
+  const cic={restaurant:'icon-restaurant',mall:'icon-mall',entertainment:'icon-entertainment'}[p.category];
+  const rt=fmtRoute(p);
+  let h='';
+  if(p.image)h+='<img src="'+esc(p.image)+'" alt="'+esc(p.name)+'" class="detail-image" onerror="this.style.display=\'none\'" onclick="window.open(\''+esc(p.image)+'\')">';
+  else h+='<div class="detail-image-placeholder">🖼️</div>';
+  h+='<div class="detail-header"><div class="icon-circle '+cic+'">'+ci+'</div><div><h2 style="margin:0 0 4px;">'+esc(p.name)+'</h2><span style="font-size:12px;background:#FFF0F3;color:#E8577B;padding:2px 8px;border-radius:8px;">'+cl+'</span></div></div>';
+  h+='<div class="route-info-bar"><div class="route-info-item">🚗 驾车约 '+rt.driveLabel+'</div><div class="route-info-item">🚶 步行约 '+rt.walkLabel+'</div><div class="route-info-item">📍 直线 '+rt.distKm+' km</div></div>';
+  h+='<div class="detail-section"><h3>评分</h3><p>'+'⭐'.repeat(p.rating)+' '+p.rating+'/5 分</p></div>';
+  if(p.address)h+='<div class="detail-section"><h3>📍 地址</h3><p>'+esc(p.address)+'</p></div>';
+  if(p.phone)h+='<div class="detail-section"><h3>📞 电话</h3><p>'+esc(p.phone)+'</p></div>';
+  if(p.desc)h+='<div class="detail-section"><h3>📝 简介</h3><p>'+esc(p.desc)+'</p></div>';
+  if(p.review)h+='<div class="detail-section"><h3>💬 用户评价</h3><div class="review-card">'+esc(p.review)+'<div class="review-source">来自小红书 / 大众点评</div></div></div>';
+  if(p.image)h+='<div class="detail-section"><h3>🖼️ 图片</h3><p style="font-size:11px;color:var(--text-light);">点击图片查看大图 | 右击可复制链接</p></div>';
+  else h+='<div class="detail-section"><p style="font-size:12px;color:var(--text-light);">💡 编辑可添加图片URL（小红书/大众点评右击图片→复制地址）</p></div>';
+  h+='<div class="modal-actions">';
+  h+='<button class="btn btn-outline" onclick="toggleFavorite(\''+p.id+'\');openDetailModal(\''+p.id+'\')">'+(p.favorited?'❤️ 取消收藏':'🤍 收藏')+'</button>';
+  h+='<button class="btn btn-outline" onclick="closeDetailModal();openEditModal(\''+p.id+'\')">✏️ 编辑</button>';
+  h+='<button class="btn btn-danger" onclick="closeDetailModal();askDelete(\''+p.id+'\')">🗑️ 删除</button>';
+  h+='<button class="btn btn-primary" onclick="closeDetailModal()">关闭</button></div>';
+  document.getElementById('detailContent').innerHTML=h;
+  document.getElementById('detailModal').style.display='flex';
+}
+function closeDetailModal(){document.getElementById('detailModal').style.display='none';}
+
+document.getElementById('addModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('detailModal').addEventListener('click',function(e){if(e.target===this)closeDetailModal();});
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  if(document.getElementById('confirmDialog').style.display==='flex'){hideConfirm();return;}
+  if(document.getElementById('detailModal').style.display==='flex'){closeDetailModal();return;}
+  if(document.getElementById('addModal').style.display==='flex'){closeModal();return;}
+});
+
+// ==================== UTILS ====================
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function showToast(m){const x=document.querySelector('.toast');if(x)x.remove();const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2000);}
+function downloadPage(){
+  const html=document.documentElement.outerHTML;
+  const blob=new Blob(['<!DOCTYPE html>\n'+html],{type:'text/html;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='空港辰院_周边生活地图.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('📥 下载完成！可在手机浏览器中打开');
+}
+
+// ==================== INIT ====================
+refreshMarkers();renderCards();loadDistricts();
+setTimeout(enrichRoutes,3000);
+
+const allCoords=places.map(p=>[p.lat,p.lng]);allCoords.push([HOME_LAT,HOME_LNG]);
+map.fitBounds(allCoords,{padding:[30,30],maxZoom:12});
+
+console.log('🏠 空港辰院 · 周边生活地图 v4 已就绪');
+console.log('📍 共 '+places.length+' 个地点 | 🟣 郑州八区+航空港区 | 💾 localStorage');
+console.log('🍽️ 2025大众点评必吃榜+小红书热门 | 🏬 2025新开商场 | 🎮 网红打卡地');
+</script>
+</body>
+</html>

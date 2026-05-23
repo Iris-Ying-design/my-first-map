@@ -1,0 +1,18 @@
+{
+  "name": "空港辰院 · 周边生活地图",
+  "short_name": "周边生活地图",
+  "description": "郑州航空港区空港辰院周边餐厅/商场/娱乐场所地图",
+  "start_url": "./周边生活地图.html",
+  "display": "standalone",
+  "background_color": "#FFF0F3",
+  "theme_color": "#E8577B",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23E8577B'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='0.08em' font-size='40'%3E🏠%3C/text%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
