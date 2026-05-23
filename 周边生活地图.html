@@ -57,7 +57,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
 .district-label { background: transparent; color: rgba(60,60,60,0.5); border: none; box-shadow: none; font-size: 11px; font-weight: 700; font-family: "PingFang SC","Microsoft YaHei",sans-serif; white-space: nowrap; pointer-events: none; }
 .leaflet-tooltip.district-label::before { display: none; }
 
-.sidebar { width: 420px; background: var(--white); display: flex; flex-direction: column; border-left: 1px solid var(--pink-100); z-index: 999; touch-action: pan-y; }
+.sidebar { width: 420px; background: var(--white); display: flex; flex-direction: column; border-left: 1px solid var(--pink-100); z-index: 999; touch-action: pan-y; min-height: 0; overflow: hidden; }
 .sidebar-search { padding: 16px 16px 12px; position: relative; }
 .sidebar-search input { width: 100%; padding: 10px 14px 10px 38px; border: 1.5px solid var(--pink-100); border-radius: var(--radius); font-size: 14px; outline: none; font-family: inherit; background: var(--pink-50); transition: all 0.2s; }
 .sidebar-search input:focus { border-color: var(--pink-300); background: var(--white); }
@@ -70,7 +70,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
 .chip.fav-filter { margin-left: auto; }
 .chip.fav-filter.active { background: var(--pink-400); color: white; border-color: var(--pink-400); }
 
-.card-list { flex: 1; overflow-y: scroll; overflow-x: hidden; padding: 0 12px 12px; overscroll-behavior: contain; touch-action: pan-y; -webkit-transform: translateZ(0); will-change: scroll-position; }
+.card-list { flex: 1; overflow-y: auto; padding: 0 12px 12px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; }
 .card-list::-webkit-scrollbar { width: 5px; }
 .card-list::-webkit-scrollbar-track { background: transparent; }
 .card-list::-webkit-scrollbar-thumb { background: var(--pink-100); border-radius: 10px; }
@@ -136,7 +136,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
 @media (max-width: 768px) {
   .main-container { flex-direction: column; }
   .map-wrapper { height: 45vh; transition: height 0.3s ease; }
-  .sidebar { width: 100%; flex: 1; border-left: none; border-top: 1px solid var(--pink-100); transition: all 0.3s ease; }
+  .sidebar { width: 100%; flex: 1; min-height: 0; overflow: hidden; border-left: none; border-top: 1px solid var(--pink-100); transition: all 0.3s ease; }
   .map-expand-btn { display: block; }
   .modal { width: 92vw; padding: 20px; max-height: 85vh; }
   .header { padding: 0 12px; }
@@ -477,15 +477,15 @@ L.marker([HOME_LAT,HOME_LNG],{icon:homeIcon}).addTo(map).bindPopup('<b>🏠 空�
 
 // district boundaries — 9-color pastel palette
 const DISTRICT_COLORS=[
-  {fill:'#FFFDE7',stroke:'#C8B900'}, // 淡黄
-  {fill:'#FFF0F3',stroke:'#D4889E'}, // 淡粉
-  {fill:'#F3E5F5',stroke:'#9B59B6'}, // 淡紫
-  {fill:'#E8F5E9',stroke:'#5DA87D'}, // 淡绿
-  {fill:'#E3F2FD',stroke:'#5DADE2'}, // 淡蓝
-  {fill:'#FFF3E0',stroke:'#E67E22'}, // 淡橙
-  {fill:'#FCE4EC',stroke:'#C0392B'}, // 淡桃
-  {fill:'#E0F2F1',stroke:'#117864'}, // 淡青
-  {fill:'#EDE7F6',stroke:'#7D3C98'}, // 淡灰紫
+  {fill:'#FFF176',stroke:'#F9A825'}, // 明黄 - 金水区
+  {fill:'#F48FB1',stroke:'#D81B60'}, // 粉红 - 二七区
+  {fill:'#CE93D8',stroke:'#8E24AA'}, // 紫色 - 中原区
+  {fill:'#A5D6A7',stroke:'#2E7D32'}, // 绿色 - 管城回族区
+  {fill:'#90CAF9',stroke:'#1565C0'}, // 蓝色 - 惠济区
+  {fill:'#FFCC80',stroke:'#E65100'}, // 橙色 - 郑东新区
+  {fill:'#EF9A9A',stroke:'#C62828'}, // 红色 - 高新区
+  {fill:'#80CBC4',stroke:'#00695C'}, // 青色 - 经开区
+  {fill:'#B39DDB',stroke:'#4527A0'}, // 深紫 - 航空港区
 ];
 const NAME_TO_COLOR={
   '金水区':0,'二七区':1,'中原区':2,'管城回族区':3,'惠济区':4,
@@ -497,13 +497,13 @@ function distStyle(f){
   const name=f.properties.name||'';
   const idx=NAME_TO_COLOR[name]!=null?NAME_TO_COLOR[name]:(cIdx++%9);
   const c=DISTRICT_COLORS[idx];
-  return{color:c.stroke,weight:3,opacity:0.9,fillColor:c.fill,fillOpacity:0.55};
+  return{color:c.stroke,weight:3,opacity:0.9,fillColor:c.fill,fillOpacity:0.65};
 }
 function distHoverStyle(f){
   const name=f.properties.name||'';
   const idx=NAME_TO_COLOR[name]!=null?NAME_TO_COLOR[name]:(cIdx++%9);
   const c=DISTRICT_COLORS[idx];
-  return{color:c.stroke,weight:5,opacity:1,fillColor:c.fill,fillOpacity:0.72};
+  return{color:c.stroke,weight:5,opacity:1,fillColor:c.fill,fillOpacity:0.80};
 }
 async function loadDistricts(){
   try{
