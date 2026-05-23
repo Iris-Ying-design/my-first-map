@@ -54,8 +54,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
 
 .district-tooltip { background: rgba(45,45,63,0.85); color: #fff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 13px; font-weight: 600; font-family: "PingFang SC","Microsoft YaHei",sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 .leaflet-tooltip.district-tooltip::before { border-top-color: rgba(45,45,63,0.85); }
+.district-label { background: transparent; color: rgba(60,60,60,0.5); border: none; box-shadow: none; font-size: 11px; font-weight: 700; font-family: "PingFang SC","Microsoft YaHei",sans-serif; white-space: nowrap; pointer-events: none; }
+.leaflet-tooltip.district-label::before { display: none; }
 
-.sidebar { width: 420px; background: var(--white); display: flex; flex-direction: column; border-left: 1px solid var(--pink-100); z-index: 999; }
+.sidebar { width: 420px; background: var(--white); display: flex; flex-direction: column; border-left: 1px solid var(--pink-100); z-index: 999; touch-action: pan-y; }
 .sidebar-search { padding: 16px 16px 12px; position: relative; }
 .sidebar-search input { width: 100%; padding: 10px 14px 10px 38px; border: 1.5px solid var(--pink-100); border-radius: var(--radius); font-size: 14px; outline: none; font-family: inherit; background: var(--pink-50); transition: all 0.2s; }
 .sidebar-search input:focus { border-color: var(--pink-300); background: var(--white); }
@@ -68,7 +70,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
 .chip.fav-filter { margin-left: auto; }
 .chip.fav-filter.active { background: var(--pink-400); color: white; border-color: var(--pink-400); }
 
-.card-list { flex: 1; overflow-y: auto; padding: 0 12px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.card-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 12px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
 .card-list::-webkit-scrollbar { width: 5px; }
 .card-list::-webkit-scrollbar-track { background: transparent; }
 .card-list::-webkit-scrollbar-thumb { background: var(--pink-100); border-radius: 10px; }
@@ -513,6 +515,15 @@ async function loadDistricts(){
       l.on('mouseover',()=>l.setStyle(distHoverStyle(f)));
       l.on('mouseout',()=>l.setStyle(distStyle(f)));
     }}).addTo(map);
+    // permanent district name labels
+    dLayer.getLayers().forEach(l=>{
+      try{
+        const c=l.getBounds().getCenter();
+        const name=l.feature?.properties?.name||'';
+        L.tooltip({permanent:true,direction:'center',className:'district-label',opacity:1})
+          .setLatLng(c).setContent(name).addTo(map);
+      }catch(e){}
+    });
     console.log('✅ 郑州区县边界已加载');
   }catch(e){console.log('⚠️ 区县边界加载失败');}
 }
