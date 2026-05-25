@@ -124,6 +124,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
 .icon-restaurant { background: #FFF0E6; } .icon-mall { background: #E8F4FD; } .icon-entertainment { background: #EDE8FD; }
 .detail-image { width: 100%; border-radius: var(--radius); margin-bottom: 16px; max-height: 260px; object-fit: cover; cursor: pointer; background: var(--pink-50); }
 .detail-image-placeholder { width: 100%; height: 160px; border-radius: var(--radius); margin-bottom: 16px; background: linear-gradient(135deg, var(--pink-50), var(--pink-100)); display: flex; align-items: center; justify-content: center; color: var(--pink-300); font-size: 40px; }
+.sheet-handle { display: none; width: 36px; height: 5px; background: #D0D0D0; border-radius: 3px; margin: 0 auto 12px; flex-shrink: 0; }
 .route-info-bar { display: flex; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
 .route-info-item { display: flex; align-items: center; gap: 6px; background: #F5F0FF; padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; color: #6D28D9; font-weight: 500; }
 
@@ -139,6 +140,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFa
   .sidebar { width: 100%; flex: 1; min-height: 0; overflow: hidden; border-left: none; border-top: 1px solid var(--pink-100); transition: all 0.3s ease; }
   .map-expand-btn { display: block; }
   .modal { width: 92vw; padding: 20px; max-height: 85vh; }
+  #detailModal { align-items: flex-end; }
+  #detailContent.modal { width: 100%; max-height: 55vh; border-radius: 20px 20px 0 0; padding-top: 8px; transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  #detailContent.modal.expanded { max-height: 95vh; }
+  .sheet-handle { display: block; }
   .header { padding: 0 12px; }
   .header-logo { font-size: 15px; }
   .header-logo span { font-size: 12px; }
@@ -433,7 +438,7 @@ function getDefaults(){
   return [...m,...r,...e];
 }
 
-let places=loadPlaces(),currentFilter='all',favFilterOnly=false,sortMode='newest',editingId=null,pendingDeleteId=null,markers={};
+let places=loadPlaces(),currentFilter='all',favFilterOnly=false,sortMode='newest',editingId=null,pendingDeleteId=null,markers={},sheetDrag=null;
 savePlaces();
 
 // ==================== DISTANCE ====================
@@ -477,15 +482,15 @@ L.marker([HOME_LAT,HOME_LNG],{icon:homeIcon}).addTo(map).bindPopup('<b>🏠 空�
 
 // district boundaries — 9-color pastel palette
 const DISTRICT_COLORS=[
-  {fill:'#FFF176',stroke:'#F9A825'}, // 明黄 - 金水区
-  {fill:'#F48FB1',stroke:'#D81B60'}, // 粉红 - 二七区
-  {fill:'#CE93D8',stroke:'#8E24AA'}, // 紫色 - 中原区
-  {fill:'#A5D6A7',stroke:'#2E7D32'}, // 绿色 - 管城回族区
-  {fill:'#90CAF9',stroke:'#1565C0'}, // 蓝色 - 惠济区
-  {fill:'#FFCC80',stroke:'#E65100'}, // 橙色 - 郑东新区
-  {fill:'#EF9A9A',stroke:'#C62828'}, // 红色 - 高新区
-  {fill:'#80CBC4',stroke:'#00695C'}, // 青色 - 经开区
-  {fill:'#B39DDB',stroke:'#4527A0'}, // 深紫 - 航空港区
+  {fill:'#FFD54F',stroke:'#F57F17'}, // 明黄 - 金水区
+  {fill:'#F06292',stroke:'#C2185B'}, // 玫红 - 二七区
+  {fill:'#BA68C8',stroke:'#7B1FA2'}, // 紫色 - 中原区
+  {fill:'#81C784',stroke:'#2E7D32'}, // 翠绿 - 管城回族区
+  {fill:'#64B5F6',stroke:'#1565C0'}, // 天蓝 - 惠济区
+  {fill:'#FFB74D',stroke:'#E65100'}, // 橙色 - 郑东新区
+  {fill:'#E57373',stroke:'#C62828'}, // 珊瑚红 - 高新区
+  {fill:'#4DB6AC',stroke:'#00695C'}, // 青绿 - 经开区
+  {fill:'#9575CD',stroke:'#4527A0'}, // 深紫 - 航空港区
 ];
 const NAME_TO_COLOR={
   '金水区':0,'二七区':1,'中原区':2,'管城回族区':3,'惠济区':4,
@@ -497,13 +502,13 @@ function distStyle(f){
   const name=f.properties.name||'';
   const idx=NAME_TO_COLOR[name]!=null?NAME_TO_COLOR[name]:(cIdx++%9);
   const c=DISTRICT_COLORS[idx];
-  return{color:c.stroke,weight:3,opacity:0.9,fillColor:c.fill,fillOpacity:0.65};
+  return{color:c.stroke,weight:3,opacity:0.9,fillColor:c.fill,fillOpacity:0.30};
 }
 function distHoverStyle(f){
   const name=f.properties.name||'';
   const idx=NAME_TO_COLOR[name]!=null?NAME_TO_COLOR[name]:(cIdx++%9);
   const c=DISTRICT_COLORS[idx];
-  return{color:c.stroke,weight:5,opacity:1,fillColor:c.fill,fillOpacity:0.80};
+  return{color:c.stroke,weight:5,opacity:1,fillColor:c.fill,fillOpacity:0.45};
 }
 async function loadDistricts(){
   try{
@@ -663,10 +668,18 @@ function openDetailModal(id){
   h+='<button class="btn btn-outline" onclick="closeDetailModal();openEditModal(\''+p.id+'\')">✏️ 编辑</button>';
   h+='<button class="btn btn-danger" onclick="closeDetailModal();askDelete(\''+p.id+'\')">🗑️ 删除</button>';
   h+='<button class="btn btn-primary" onclick="closeDetailModal()">关闭</button></div>';
-  document.getElementById('detailContent').innerHTML=h;
+  const dc=document.getElementById('detailContent');
+  dc.innerHTML=h;
+  dc.classList.remove('expanded');
+  if(window.innerWidth<=768){
+    const handle=document.createElement('div');
+    handle.className='sheet-handle';
+    dc.insertBefore(handle,dc.firstChild);
+    setupSheetDrag(dc);
+  }
   document.getElementById('detailModal').style.display='flex';
 }
-function closeDetailModal(){document.getElementById('detailModal').style.display='none';}
+function closeDetailModal(){document.getElementById('detailModal').style.display='none';sheetDrag=null;}
 
 document.getElementById('addModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 document.getElementById('detailModal').addEventListener('click',function(e){if(e.target===this)closeDetailModal();});
@@ -676,6 +689,45 @@ document.addEventListener('keydown',function(e){
   if(document.getElementById('detailModal').style.display==='flex'){closeDetailModal();return;}
   if(document.getElementById('addModal').style.display==='flex'){closeModal();return;}
 });
+
+// ==================== SHEET DRAG ====================
+document.addEventListener('touchmove',function(e){
+  if(!sheetDrag||!sheetDrag.dragging)return;
+  const dy=sheetDrag.startY-e.touches[0].clientY;
+  if(Math.abs(dy)>5)sheetDrag.hasMoved=true;
+  const newH=Math.max(150,Math.min(window.innerHeight-40,sheetDrag.startH+dy));
+  sheetDrag.content.style.maxHeight=newH+'px';
+},{passive:false});
+document.addEventListener('touchend',function(){
+  if(!sheetDrag||!sheetDrag.dragging)return;
+  sheetDrag.dragging=false;
+  const content=sheetDrag.content;
+  content.style.transition='max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+  const curH=content.getBoundingClientRect().height;
+  if(!sheetDrag.hasMoved){
+    content.classList.toggle('expanded');
+  }else if(curH>window.innerHeight*0.65){
+    content.classList.add('expanded');
+  }else if(curH<window.innerHeight*0.25){
+    closeDetailModal();
+    return;
+  }
+  content.style.maxHeight='';
+});
+function setupSheetDrag(content){
+  if(window.innerWidth>768)return;
+  const handle=content.querySelector('.sheet-handle');
+  if(!handle)return;
+  sheetDrag={content:content,startY:0,startH:0,dragging:false,hasMoved:false};
+  handle.addEventListener('touchstart',function(e){
+    sheetDrag.startY=e.touches[0].clientY;
+    sheetDrag.startH=content.getBoundingClientRect().height;
+    sheetDrag.dragging=true;
+    sheetDrag.hasMoved=false;
+    sheetDrag.content=content;
+    content.style.transition='none';
+  },{passive:false});
+}
 
 // ==================== UTILS ====================
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
